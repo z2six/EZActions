@@ -1,4 +1,3 @@
-// MainFile: src/main/java/org/z2six/minemenuplus/helper/InputInjector.java
 package org.z2six.minemenuplus.helper;
 
 import com.mojang.blaze3d.platform.InputConstants;
@@ -15,7 +14,7 @@ import javax.annotation.Nullable;
 import java.util.Objects;
 
 /**
- * Centralized input delivery.
+ * Centralized input delivery + utility setters used by the radial and editor.
  */
 public final class InputInjector {
 
@@ -92,7 +91,27 @@ public final class InputInjector {
         }
     }
 
-    /* -------------------- helpers -------------------- */
+    /* -------------------- radial/editor helpers -------------------- */
+
+    /** Set a mapping's pressed state (used for movement passthrough while the radial is open). */
+    public static void setKeyPressed(@Nullable KeyMapping mapping, boolean down) {
+        if (mapping == null) return;
+        try {
+            mapping.setDown(down);
+        } catch (Throwable ignored) {}
+    }
+
+    /** Convenience wrapper: resolve by name then set pressed state. */
+    public static void setMappingPressed(String nameOrKey, boolean down) {
+        try {
+            final Minecraft mc = Minecraft.getInstance();
+            if (mc == null || mc.options == null) return;
+            KeyMapping km = resolveMappingByName(mc.options, nameOrKey);
+            setKeyPressed(km, down);
+        } catch (Throwable ignored) {}
+    }
+
+    /* -------------------- INPUT mode (GLFW press/release) -------------------- */
 
     private static boolean deliverInput(Minecraft mc, int glfwKey, int glfwScanCode, int glfwMods) {
         try {
@@ -127,6 +146,8 @@ public final class InputInjector {
         }
     }
 
+    /* -------------------- TICK mode (setDown true->false) -------------------- */
+
     private static boolean deliverTick(KeyMapping mapping, boolean toggle) {
         try {
             if (toggle) {
@@ -150,6 +171,8 @@ public final class InputInjector {
             return false;
         }
     }
+
+    /* -------------------- misc helpers -------------------- */
 
     private static boolean isTextInputFocused(Minecraft mc) {
         try {

@@ -1,4 +1,3 @@
-// MainFile: src/main/java/org/z2six/minemenuplus/gui/RadialMenuScreen.java
 package org.z2six.minemenuplus.gui;
 
 import net.minecraft.client.Minecraft;
@@ -8,14 +7,18 @@ import net.minecraft.network.chat.Component;
 import org.z2six.minemenuplus.Constants;
 import org.z2six.minemenuplus.data.menu.MenuItem;
 import org.z2six.minemenuplus.data.menu.RadialMenu;
+import org.z2six.minemenuplus.gui.RadialScreenMath.Radii;
+import org.z2six.minemenuplus.handler.KeyboardHandler;
 import org.z2six.minemenuplus.gui.noblur.NoMenuBlurScreen;
 
 import java.util.List;
 
 /**
- * // MainFile: RadialMenuScreen.java
- * Same UI as before, but action execution is deferred by one client tick (via InputInjector),
- * and we only close the screen here. (Inventory/chat/advancements now work again.)
+ * Radial menu:
+ * - No screen overlay, game continues; mouse captured for selection.
+ * - Hold-to-open. Release = execute hovered action (non-category).
+ * - LMB on action: close+execute; LMB on category: drill in (stay open).
+ * - RMB: go back.
  */
 public final class RadialMenuScreen extends Screen implements NoMenuBlurScreen {
 
@@ -35,86 +38,105 @@ public final class RadialMenuScreen extends Screen implements NoMenuBlurScreen {
         return false;
     }
 
+    /** Called by KeyboardHandler on hotkey release (falling edge). */
+    public void onHotkeyReleased() {
+        try {
+            List<MenuItem> items = RadialMenu.currentItems();
+            if (items != null && !items.isEmpty()
+                    && hoveredIndex >= 0 && hoveredIndex < items.size()) {
+                MenuItem mi = items.get(hoveredIndex);
+                if (!mi.isCategory()) {
+                    // Execute action on release
+                    KeyboardHandler.suppressReopenUntilReleased();
+                    executeAndClose(mi);
+                    return;
+                }
+            }
+            // Nothing actionable hovered → just close
+            Minecraft.getInstance().setScreen(null);
+        } catch (Throwable t) {
+            Constants.LOG.warn("[{}] onHotkeyReleased error: {}", Constants.MOD_NAME, t.toString());
+            Minecraft.getInstance().setScreen(null);
+        }
+    }
+
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         try {
-            g.fill(0, 0, this.width, this.height, 0x55000000);
-
+            // No backdrop fill: game remains fully visible
             List<MenuItem> items = RadialMenu.currentItems();
             int cx = this.width / 2;
             int cy = this.height / 2;
 
+            Radii rr = RadialScreenMath.computeRadii(items == null ? 0 : items.size());
+
             hoveredIndex = (items == null || items.isEmpty())
                     ? -1
-                    : RadialScreenMath.pickSector(mouseX, mouseY, cx, cy, items.size());
+                    : RadialScreenMath.pickSector(mouseX, mouseY, cx, cy, items.size(), rr);
 
-            RadialScreenDraw.drawRing(g, this.font, cx, cy, items, hoveredIndex);
-
-            if (items != null && !items.isEmpty() && hoveredIndex >= 0 && hoveredIndex < items.size()) {
-                MenuItem mi = items.get(hoveredIndex);
-                g.drawCenteredString(this.font, mi.title(), cx, cy - 6, 0xFFFFFF);
-            } else {
-                String hint = RadialMenu.canGoBack()
-                        ? "Right-click: Back | Esc: Close"
-                        : "Esc: Close";
-                g.drawCenteredString(this.font, hint, cx, cy + 14, 0xAAAAAA);
-            }
+            RadialScreenDraw.drawRing(g, this.font, cx, cy, items, hoveredIndex, rr);
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] Radial render error: {}", Constants.MOD_NAME, t.toString());
         }
+
+        // DO NOT draw any hint text in the center
         super.render(g, mouseX, mouseY, partialTick);
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         try {
-            if (button == 1) {
+            if (button == 1) { // RMB → back
                 if (RadialMenu.canGoBack()) {
                     RadialMenu.goBack();
                     this.minecraft.setScreen(new RadialMenuScreen());
-                    return true;
+                } else {
+                    onClose();
                 }
-                onClose();
                 return true;
             }
 
-            if (button == 0) {
+            if (button == 0) { // LMB
                 List<MenuItem> items = RadialMenu.currentItems();
                 if (items == null || items.isEmpty()) return true;
                 if (hoveredIndex < 0 || hoveredIndex >= items.size()) return true;
 
                 MenuItem mi = items.get(hoveredIndex);
-
                 if (mi.isCategory()) {
                     RadialMenu.enterCategory(mi);
                     this.minecraft.setScreen(new RadialMenuScreen());
                     return true;
+                } else {
+                    executeAndClose(mi);
+                    return true;
                 }
-
-                // Close first; ClickAction implementations will handle their own deferral.
-                Constants.LOG.info("[{}] Radial: choose action id='{}' title='{}' (closing then deferring)",
-                        Constants.MOD_NAME, mi.id(), mi.title());
-
-                onClose();
-
-                // Let the action run (it will use InputInjector which defers actual press/release)
-                Minecraft mc = this.minecraft;
-                mc.execute(() -> {
-                    try {
-                        boolean ok = mi.action() != null && mi.action().execute(mc);
-                        if (!ok) {
-                            Constants.LOG.info("[{}] Radial action returned false for '{}'", Constants.MOD_NAME, mi.id());
-                        }
-                    } catch (Throwable t) {
-                        Constants.LOG.warn("[{}] Radial deferred execution error for '{}': {}", Constants.MOD_NAME, mi.id(), t.toString());
-                    }
-                });
-                return true;
             }
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] Radial mouseClicked error: {}", Constants.MOD_NAME, t.toString());
         }
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    private void executeAndClose(MenuItem mi) {
+        try {
+            Constants.LOG.info("[{}] Radial: execute action id='{}' title='{}' (closing then deferring)",
+                    Constants.MOD_NAME, mi.id(), mi.title());
+            Minecraft mc = this.minecraft;
+            onClose(); // close first
+            mc.execute(() -> {
+                try {
+                    boolean ok = mi.action() != null && mi.action().execute(mc);
+                    if (!ok) {
+                        Constants.LOG.info("[{}] Radial action returned false for '{}'", Constants.MOD_NAME, mi.id());
+                    }
+                } catch (Throwable t) {
+                    Constants.LOG.warn("[{}] Radial deferred execution error for '{}': {}", Constants.MOD_NAME, mi.id(), t.toString());
+                }
+            });
+        } catch (Throwable t) {
+            Constants.LOG.warn("[{}] executeAndClose error: {}", Constants.MOD_NAME, t.toString());
+            onClose();
+        }
     }
 
     @Override

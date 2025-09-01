@@ -14,8 +14,6 @@ import java.util.*;
  */
 public final class RadialMenu {
 
-    private static final int MAX_ITEMS_PER_PAGE = 12;
-
     private static List<MenuItem> ROOT = new ArrayList<>();
     // PATH is maintained root -> ... -> deepest (append when entering, remove last when going back)
     private static final Deque<MenuItem> PATH = new ArrayDeque<>();
@@ -31,6 +29,11 @@ public final class RadialMenu {
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] Failed to open radial: {}", Constants.MOD_NAME, t.toString());
         }
+    }
+
+    /** Manually reset to root (used by editor or tests). */
+    public static void resetToRoot() {
+        PATH.clear();
     }
 
     public static void enterCategory(MenuItem cat) {
@@ -49,7 +52,10 @@ public final class RadialMenu {
     public static List<MenuItem> currentItems() {
         ensureLoaded();
         List<MenuItem> items = ROOT;
-        for (MenuItem cat : PATH) items = cat.childrenMutable(); // walks root -> deepest
+        // walk root -> deepest
+        for (MenuItem cat : PATH) {
+            items = cat.childrenMutable();
+        }
         return items;
     }
 
@@ -89,13 +95,9 @@ public final class RadialMenu {
         return ROOT;
     }
 
+    /** No cap: allow any number of items on a page. */
     public static boolean addToCurrent(MenuItem item) {
         List<MenuItem> cur = currentItems();
-        if (cur.size() >= MAX_ITEMS_PER_PAGE) {
-            Constants.LOG.info("[{}] Page is full ({} items). Not adding '{}'.",
-                    Constants.MOD_NAME, MAX_ITEMS_PER_PAGE, item.id());
-            return false;
-        }
         cur.add(item);
         persist();
         return true;
@@ -103,7 +105,7 @@ public final class RadialMenu {
 
     public static boolean removeFromCurrent(String id) {
         List<MenuItem> cur = currentItems();
-        boolean removed = cur.removeIf(mi -> mi.id().equals(id));
+        boolean removed = cur.removeIf(mi -> Objects.equals(mi.id(), id));
         if (removed) persist();
         return removed;
     }
@@ -111,7 +113,7 @@ public final class RadialMenu {
     public static boolean replaceInCurrent(String id, MenuItem replacement) {
         List<MenuItem> cur = currentItems();
         for (int i = 0; i < cur.size(); i++) {
-            if (cur.get(i).id().equals(id)) {
+            if (Objects.equals(cur.get(i).id(), id)) {
                 cur.set(i, replacement);
                 persist();
                 return true;
@@ -120,10 +122,11 @@ public final class RadialMenu {
         return false;
     }
 
+    /** Legacy delta-move by id (kept for compatibility). */
     public static boolean moveInCurrent(String id, int delta) {
         List<MenuItem> cur = currentItems();
         for (int i = 0; i < cur.size(); i++) {
-            if (cur.get(i).id().equals(id)) {
+            if (Objects.equals(cur.get(i).id(), id)) {
                 int j = Math.max(0, Math.min(cur.size() - 1, i + delta));
                 if (i == j) return false;
                 Collections.swap(cur, i, j);

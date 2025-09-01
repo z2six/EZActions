@@ -1,33 +1,36 @@
-// MainFile: src/main/java/org/z2six/minemenuplus/gui/RadialScreenMath.java
 package org.z2six.minemenuplus.gui;
 
 import org.z2six.minemenuplus.Constants;
+import org.z2six.minemenuplus.config.RadialConfig;
 
-/**
- * // MainFile: RadialScreenMath.java
- * Pure math helpers for the radial menu screen (sector picking, radii, etc.).
- * Kept separate so RadialMenuScreen stays lean.
- */
+/** Math helpers for the radial menu. */
 public final class RadialScreenMath {
 
     private RadialScreenMath() {}
 
-    /** Outer radius used to validate hover range (in GUI pixels). */
-    public static final double RADIUS_OUTER = 140.0;
+    /** Dynamic radii based on item count and config. */
+    public static Radii computeRadii(int items) {
+        try {
+            RadialConfig c = RadialConfig.get();
+            int n = Math.max(0, items);
+            int extra = Math.max(0, n - Math.max(0, c.scaleStartThreshold));
+            double rOuter = c.baseOuterRadius + extra * Math.max(0, c.scalePerItem);
+            double rInner = Math.max(8, rOuter - Math.max(8, c.ringThickness));
+            return new Radii(rInner, rOuter, c.deadzone);
+        } catch (Throwable t) {
+            Constants.LOG.warn("[{}] computeRadii error: {}", Constants.MOD_NAME, t.toString());
+            // Safe fallback
+            return new Radii(42.0, 72.0, 18);
+        }
+    }
 
-    /** Deadzone radius around the center that selects nothing. */
-    public static final double DEADZONE = 18.0;
+    public record Radii(double inner, double outer, int deadzone) {}
 
     /**
-     * Return the sector index under the mouse or -1 if none.
-     *
-     * @param mouseX gui mouse x
-     * @param mouseY gui mouse y
-     * @param cx center x
-     * @param cy center y
-     * @param sectors number of items (sectors), must be >= 1
+     * Pick sector index or -1 if the cursor is inside deadzone or way outside.
+     * Angles start at the top (12 o'clock) and increase clockwise.
      */
-    public static int pickSector(double mouseX, double mouseY, int cx, int cy, int sectors) {
+    public static int pickSector(double mouseX, double mouseY, int cx, int cy, int sectors, Radii rr) {
         try {
             if (sectors <= 0) return -1;
 
@@ -35,18 +38,17 @@ public final class RadialScreenMath {
             double dy = mouseY - cy;
             double dist2 = dx * dx + dy * dy;
 
-            if (dist2 < DEADZONE * DEADZONE) return -1;
-            if (dist2 > (RADIUS_OUTER * RADIUS_OUTER) * 1.2) return -1;
+            if (dist2 < (double) rr.deadzone() * rr.deadzone()) return -1;
+            double maxR = rr.outer() * 1.35; // tolerant outer bound
+            if (dist2 > maxR * maxR) return -1;
 
-            // Angle with 0 at the top (negative Y), clockwise
             double ang = Math.atan2(dy, dx); // [-pi, +pi], 0 on +X
-            ang += Math.PI / 2.0;            // rotate so 0 is at top
+            ang += Math.PI / 2.0;            // 0 at top
             if (ang < 0) ang += Math.PI * 2.0;
 
             double step = (Math.PI * 2.0) / sectors;
             int idx = (int) Math.floor(ang / step);
-            if (idx < 0 || idx >= sectors) return -1;
-            return idx;
+            return (idx < 0 || idx >= sectors) ? -1 : idx;
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] pickSector error: {}", Constants.MOD_NAME, t.toString());
             return -1;

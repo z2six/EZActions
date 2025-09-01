@@ -2,6 +2,7 @@
 package org.z2six.minemenuplus.gui.editor;
 
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -23,9 +24,10 @@ import java.util.Objects;
 /**
  * Menu Editor (main options screen).
  * - Left: action buttons (add key/command/category, edit, remove)
- * - Right: list of items. Categories show as "(RMB to open) Name". RMB opens the category.
- * - When inside a category, a breadcrumb header "root/…/…" is shown above a red "Back" pseudo-row.
+ * - Right: list of items. Categories show as "(RMB to open) Name". RMB enters category; LMB selects/drag.
+ * - When inside a category, a red "Back" pseudo-row appears on top; clicking it goes to parent.
  * - Drag & drop to reorder, with a blue insertion indicator line.
+ * - Scrollbar & mouse wheel supported (like pickers).
  * - All mutations are persisted via RadialMenu helpers.
  */
 public final class MenuEditorScreen extends Screen {
@@ -36,13 +38,16 @@ public final class MenuEditorScreen extends Screen {
     private static final int ROW_H = 24;
     private static final int ICON_SZ = 18;
 
-    // Breadcrumb header height (inside list panel)
-    private static final int HEADER_H = 16;
-
     // Drag visuals
     private static final int BLUE = 0x802478FF;
     private static final int HILITE = 0x202478FF;
     private static final int ROW_BG = 0x20101010;
+
+    // Scrollbar visuals
+    private static final int SB_W = 6;        // scrollbar width
+    private static final int SB_BG = 0x40000000;
+    private static final int SB_KNOB = 0x80FFFFFF;
+    private static final int SB_KNOB_MINH = 20;
 
     // Construction
     private final Screen parent;
@@ -71,6 +76,10 @@ public final class MenuEditorScreen extends Screen {
     private int dragGhostOffsetY = 0;
     private int dropAt = -1;        // insertion position (between rows)
 
+    // Scrollbar drag
+    private boolean sbDragging = false;
+    private int sbGrabDy = 0; // mouse offset inside knob while dragging
+
     // --- Row model -----------------------------------------------------------
 
     private sealed interface Row {
@@ -84,7 +93,7 @@ public final class MenuEditorScreen extends Screen {
     public MenuEditorScreen() { this(null); }
 
     public MenuEditorScreen(Screen parent) {
-        super(Component.literal("EZ Actions - Menu Editor"));
+        super(Component.literal("MineMenuPlus - Menu Editor"));
         this.parent = parent;
     }
 
@@ -97,11 +106,6 @@ public final class MenuEditorScreen extends Screen {
 
     private boolean atRoot() {
         return !RadialMenu.canGoBack();
-    }
-
-    /** Visible header height inside the list area (0 at root, HEADER_H when inside). */
-    private int headerH() {
-        return atRoot() ? 0 : HEADER_H;
     }
 
     /** Live list for whatever level the editor is currently showing. */
@@ -130,6 +134,7 @@ public final class MenuEditorScreen extends Screen {
         // Clamp selection
         if (selectedRow >= rows.size()) selectedRow = rows.size() - 1;
         if (selectedRow < -1) selectedRow = -1;
+        clampScroll();
     }
 
     private int contentCount() {
@@ -138,25 +143,16 @@ public final class MenuEditorScreen extends Screen {
         return c;
     }
 
-    private int rowCount() {
-        return rows.size();
-    }
+    private int rowCount() { return rows.size(); }
 
-    private int visibleRowCount() {
-        int vh = listHeight - headerH();
-        return Math.max(0, vh / ROW_H);
-    }
+    private int visibleRowCount() { return Math.max(0, listHeight / ROW_H); }
 
-    private int firstVisibleRow() {
-        return Math.max(0, (int)Math.floor(scrollY / ROW_H));
-    }
+    private int firstVisibleRow() { return Math.max(0, (int)Math.floor(scrollY / ROW_H)); }
 
-    private int lastVisibleRow() {
-        return Math.min(rowCount() - 1, firstVisibleRow() + visibleRowCount());
-    }
+    private int lastVisibleRow() { return Math.min(rowCount() - 1, firstVisibleRow() + visibleRowCount()); }
 
     private int mouseToRow(double mouseY) {
-        int y = (int)mouseY - (listTop + headerH()) + (int)scrollY;
+        int y = (int)mouseY - listTop + (int)scrollY;
         if (y < 0) return -1;
         int idx = y / ROW_H;
         return idx >= 0 && idx < rowCount() ? idx : -1;
@@ -164,18 +160,24 @@ public final class MenuEditorScreen extends Screen {
 
     private void ensureSelectedVisible() {
         if (selectedRow < 0) return;
-        int topPix = (int)scrollY;
         int selTop = selectedRow * ROW_H;
         int selBot = selTop + ROW_H;
-        int winTop = topPix;
-        int winBot = topPix + (listHeight - headerH());
+        int winTop = (int)scrollY;
+        int winBot = winTop + listHeight;
 
         if (selTop < winTop) {
             scrollY = selTop;
         } else if (selBot > winBot) {
-            scrollY = selBot - (listHeight - headerH());
+            scrollY = selBot - listHeight;
         }
+        clampScroll();
+    }
+
+    private void clampScroll() {
+        int totalPx = rowCount() * ROW_H;
+        int maxScroll = Math.max(0, totalPx - listHeight);
         if (scrollY < 0) scrollY = 0;
+        if (scrollY > maxScroll) scrollY = maxScroll;
     }
 
     private int rowToContentIndex(int rowIdx) {
@@ -226,7 +228,7 @@ public final class MenuEditorScreen extends Screen {
         addRenderableWidget(filterBox);
         y += 24;
 
-        // Add Key (save-handler so it adds to the *current* level)
+        // Add Key (wired with save-handler so it adds to the *current* level)
         btnAddKey = Button.builder(Component.literal("Add Key Action"), b -> {
             var parent = this;
             this.minecraft.setScreen(new KeyActionEditScreen(
@@ -246,15 +248,16 @@ public final class MenuEditorScreen extends Screen {
                         }
                         RadialMenu.persist();
                         rebuildRows();
-                        int idx2 = -1;
-                        for (int i2 = 0; i2 < rows.size(); i2++) {
-                            Row r = rows.get(i2);
+                        // select the newly added/edited row
+                        int idx = -1;
+                        for (int i = 0; i < rows.size(); i++) {
+                            Row r = rows.get(i);
                             if (r instanceof Row.ItemRow ir && Objects.equals(ir.item().id(), newItem.id())) {
-                                idx2 = i2; break;
+                                idx = i; break;
                             }
                         }
-                        if (idx2 >= 0) {
-                            selectedRow = idx2;
+                        if (idx >= 0) {
+                            selectedRow = idx;
                             ensureSelectedVisible();
                         }
                     }
@@ -304,6 +307,7 @@ public final class MenuEditorScreen extends Screen {
         dragging = false;
         dragRowIdx = -1;
         dropAt = -1;
+        sbDragging = false;
 
         rebuildRows();
     }
@@ -367,7 +371,7 @@ public final class MenuEditorScreen extends Screen {
         MenuItem mi = ((Row.ItemRow) r).item();
         String id = mi.id();
         try {
-            boolean ok = RadialMenu.removeInCurrent(id); // persist + save
+            boolean ok = RadialMenu.removeFromCurrent(id);
             if (!ok) {
                 Constants.LOG.info("[{}] Remove failed for '{}'.", Constants.MOD_NAME, id);
             }
@@ -382,30 +386,24 @@ public final class MenuEditorScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        // Background panels
         g.fill(0, 0, this.width, this.height, 0x88000000);
         g.fill(PAD, PAD, PAD + LEFT_W, this.height - PAD, 0xC0101010);
         g.fill(listLeft, listTop, listLeft + listWidth, listTop + listHeight, 0xC0101010);
 
+        // Title
         g.drawCenteredString(this.font, this.title.getString(), this.width / 2, 6, 0xFFFFFF);
 
-        // Breadcrumb header inside list (only when not at root)
-        int header = headerH();
-        if (header > 0) {
-            List<String> crumbs = RadialMenu.pathTitles();
-            String path = String.join("/", crumbs);
-            g.drawString(this.font, path, listLeft + 6, listTop + 4, 0xFFFFFF);
-            // subtle divider
-            g.fill(listLeft + 4, listTop + header - 2, listLeft + listWidth - 4, listTop + header - 1, 0x30FFFFFF);
-        }
-
+        // Render list
         int first = firstVisibleRow();
         int last = lastVisibleRow();
 
         hoveredRow = mouseToRow(mouseY);
 
+        // Rows
         for (int i = first; i <= last; i++) {
-            int y = listTop + header + (i * ROW_H) - (int)scrollY;
-            if (y + ROW_H < listTop + header || y > listTop + listHeight) continue;
+            int y = listTop + (i * ROW_H) - (int)scrollY;
+            if (y + ROW_H < listTop || y > listTop + listHeight) continue;
 
             boolean sel = (i == selectedRow);
             boolean hov = (i == hoveredRow);
@@ -420,6 +418,7 @@ public final class MenuEditorScreen extends Screen {
             } else if (r instanceof Row.ItemRow ir) {
                 MenuItem mi = ir.item();
                 int textX = listLeft + 8;
+
                 IconSpec icon = mi.icon();
                 if (icon != null) {
                     IconRenderer.drawIcon(g, listLeft + 8 + ICON_SZ / 2, y + ROW_H / 2, icon);
@@ -437,8 +436,9 @@ public final class MenuEditorScreen extends Screen {
             }
         }
 
+        // Drag ghost + insertion line
         if (dragging && dragRowIdx >= 0 && dragRowIdx < rows.size()) {
-            int yGhost = (int) (mouseY - dragGhostOffsetY);
+            int yGhost = mouseY - dragGhostOffsetY;
             g.fill(listLeft, yGhost, listLeft + listWidth, yGhost + ROW_H, 0x40FFFFFF);
 
             Row r = rows.get(dragRowIdx);
@@ -452,37 +452,74 @@ public final class MenuEditorScreen extends Screen {
             }
 
             if (dropAt >= 0) {
-                int yLine = listTop + header + (dropAt * ROW_H) - (int)scrollY;
+                int yLine = listTop + (dropAt * ROW_H) - (int)scrollY;
                 g.fill(listLeft, yLine - 1, listLeft + listWidth, yLine + 1, BLUE);
             }
         }
 
+        // Scrollbar (like pickers)
+        drawScrollbar(g);
+
         super.render(g, mouseX, mouseY, partialTick);
+    }
+
+    private void drawScrollbar(GuiGraphics g) {
+        int totalPx = rowCount() * ROW_H;
+        if (totalPx <= listHeight) return; // no need
+
+        int trackX1 = listLeft + listWidth - SB_W;
+        int trackX2 = listLeft + listWidth;
+        int trackY1 = listTop;
+        int trackY2 = listTop + listHeight;
+        g.fill(trackX1, trackY1, trackX2, trackY2, SB_BG);
+
+        double ratio = (double) listHeight / (double) totalPx;
+        int knobH = Math.max(SB_KNOB_MINH, (int) (listHeight * ratio));
+        int maxScroll = totalPx - listHeight;
+        int knobY = (maxScroll <= 0) ? trackY1
+                : (int) (trackY1 + (listHeight - knobH) * (scrollY / maxScroll));
+
+        g.fill(trackX1 + 1, knobY, trackX2 - 1, knobY + knobH, SB_KNOB);
     }
 
     // --- Mouse interaction ---------------------------------------------------
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        // Scrollbar hit-test first
+        if (hitScrollbar(mouseX, mouseY)) {
+            int[] k = knobRect();
+            boolean inKnob = mouseY >= k[1] && mouseY <= k[3];
+            if (inKnob && button == 0) {
+                sbDragging = true;
+                sbGrabDy = (int)mouseY - k[1];
+                return true;
+            }
+            // click track: jump knob
+            jumpScrollTo(mouseY);
+            return true;
+        }
+
+        // Only react if click inside list area for selection / navigation / drag
         boolean inList = mouseX >= listLeft && mouseX < listLeft + listWidth
                 && mouseY >= listTop && mouseY < listTop + listHeight;
 
         if (inList) {
-            // Ignore clicks in breadcrumb header area
-            if (!atRoot() && mouseY < listTop + HEADER_H) {
-                return super.mouseClicked(mouseX, mouseY, button);
-            }
-
             int idx = mouseToRow(mouseY);
             if (idx >= 0 && idx < rowCount()) {
                 selectedRow = idx;
                 ensureSelectedVisible();
 
                 Row r = rows.get(idx);
-
-                // RMB -> enter category (do not start drag)
                 if (button == 1) {
-                    if (r instanceof Row.ItemRow ir) {
+                    // RMB: Back or enter category
+                    if (r instanceof Row.BackRow) {
+                        RadialMenu.goBack();
+                        scrollY = 0;
+                        selectedRow = -1;
+                        rebuildRows();
+                        return true;
+                    } else if (r instanceof Row.ItemRow ir) {
                         MenuItem mi = ir.item();
                         if (mi.isCategory()) {
                             RadialMenu.enterCategory(mi);
@@ -492,22 +529,19 @@ public final class MenuEditorScreen extends Screen {
                             return true;
                         }
                     }
-                    return true; // ignore RMB on BackRow / leaf rows for now
-                }
-
-                // LMB behavior: Back goes up; ItemRow starts drag (for both actions & categories)
-                if (button == 0) {
+                } else if (button == 0) {
+                    // LMB on item: select/drag; on Back: treat as back for convenience
                     if (r instanceof Row.BackRow) {
                         RadialMenu.goBack();
                         scrollY = 0;
                         selectedRow = -1;
                         rebuildRows();
                         return true;
-                    } else if (r instanceof Row.ItemRow) {
+                    } else {
+                        // Start drag
                         dragging = true;
                         dragRowIdx = idx;
-                        int rowTop = listTop + headerH() + (idx * ROW_H) - (int)scrollY;
-                        dragGhostOffsetY = (int)mouseY - rowTop;
+                        dragGhostOffsetY = (int)mouseY - (listTop + (idx * ROW_H) - (int)scrollY);
                         dropAt = computeDropAt(mouseY);
                         return true;
                     }
@@ -521,16 +555,20 @@ public final class MenuEditorScreen extends Screen {
     private int computeDropAt(double mouseY) {
         int raw = mouseToRow(mouseY);
         if (raw < 0) {
-            if (mouseY < listTop + headerH()) return atRoot() ? 0 : 1; // keep Back (if any) pinned
-            if (mouseY > listTop + headerH() + rowCount() * ROW_H) return rowCount();
+            if (mouseY < listTop) return atRoot() ? 0 : 1;
+            if (mouseY > listTop + rowCount() * ROW_H) return rowCount();
             return -1;
         }
-        int within = (int)mouseY - (listTop + headerH() + (raw * ROW_H) - (int)scrollY);
-        return (within < ROW_H / 2) ? raw : raw + 1;
+        int within = (int)mouseY - (listTop + (raw * ROW_H) - (int)scrollY);
+        return (within < ROW_H / 2) ? raw : (raw + 1);
     }
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (sbDragging && button == 0) {
+            dragScrollTo(mouseY - sbGrabDy);
+            return true;
+        }
         if (dragging && button == 0) {
             dropAt = computeDropAt(mouseY);
             return true;
@@ -540,6 +578,10 @@ public final class MenuEditorScreen extends Screen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (sbDragging && button == 0) {
+            sbDragging = false;
+            return true;
+        }
         if (dragging && button == 0) {
             int fromRow = dragRowIdx;
             int toRow = dropAt;
@@ -554,7 +596,7 @@ public final class MenuEditorScreen extends Screen {
 
                 if (fromContent >= 0 && toContent >= 0) {
                     try {
-                        boolean ok = RadialMenu.moveInCurrent(fromContent, toContent); // write-through
+                        boolean ok = RadialMenu.moveInCurrent(fromContent, toContent);
                         if (!ok) {
                             Constants.LOG.info("[{}] Move failed: {} -> {}", Constants.MOD_NAME, fromContent, toContent);
                         }
@@ -576,17 +618,74 @@ public final class MenuEditorScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
-        if (mouseX >= listLeft && mouseX < listLeft + listWidth
-                && mouseY >= listTop && mouseY < listTop + listHeight) {
-
-            int totalPx = rowCount() * ROW_H;
-            int maxScroll = Math.max(0, totalPx - (listHeight - headerH()));
-            scrollY -= deltaY * ROW_H * 2;
-            if (scrollY < 0) scrollY = 0;
-            if (scrollY > maxScroll) scrollY = maxScroll;
+        // Scroll only when over the list or scrollbar
+        if (hitList(mouseX, mouseY) || hitScrollbar(mouseX, mouseY)) {
+            scrollY -= deltaY * ROW_H * 2; // two rows per wheel notch
+            clampScroll();
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, deltaX, deltaY);
+    }
+
+    private boolean hitList(double mx, double my) {
+        return mx >= listLeft && mx < listLeft + listWidth
+                && my >= listTop && my < listTop + listHeight;
+    }
+
+    private boolean hitScrollbar(double mx, double my) {
+        int x1 = listLeft + listWidth - SB_W;
+        int x2 = listLeft + listWidth;
+        return mx >= x1 && mx < x2 && my >= listTop && my < listTop + listHeight;
+    }
+
+    private int[] knobRect() {
+        int totalPx = rowCount() * ROW_H;
+        int trackX1 = listLeft + listWidth - SB_W;
+        int trackX2 = listLeft + listWidth;
+        int trackY1 = listTop;
+        int trackY2 = listTop + listHeight;
+
+        if (totalPx <= listHeight) {
+            return new int[]{trackX1 + 1, trackY1, trackX2 - 1, trackY1 + listHeight};
+        }
+
+        double ratio = (double) listHeight / (double) totalPx;
+        int knobH = Math.max(SB_KNOB_MINH, (int) (listHeight * ratio));
+        int maxScroll = totalPx - listHeight;
+        int knobY = (maxScroll <= 0) ? trackY1
+                : (int) (trackY1 + (listHeight - knobH) * (scrollY / maxScroll));
+
+        return new int[]{trackX1 + 1, knobY, trackX2 - 1, knobY + knobH};
+    }
+
+    private void jumpScrollTo(double mouseY) {
+        int totalPx = rowCount() * ROW_H;
+        if (totalPx <= listHeight) { scrollY = 0; return; }
+
+        int[] k = knobRect();
+        int trackY1 = listTop;
+        int knobH = k[3] - k[1];
+        int knobTop = (int)mouseY - knobH / 2;
+        dragScrollTo(knobTop);
+    }
+
+    private void dragScrollTo(double knobTopY) {
+        int totalPx = rowCount() * ROW_H;
+        int maxScroll = Math.max(0, totalPx - listHeight);
+        if (totalPx <= listHeight) { scrollY = 0; return; }
+
+        int trackY1 = listTop;
+        int trackY2 = listTop + listHeight;
+        int[] k = knobRect();
+        int knobH = k[3] - k[1];
+
+        int minTop = trackY1;
+        int maxTop = trackY2 - knobH;
+        int clampedTop = Math.max(minTop, Math.min(maxTop, (int)knobTopY));
+
+        double t = (double)(clampedTop - trackY1) / (double)(listHeight - knobH);
+        scrollY = t * maxScroll;
+        clampScroll();
     }
 
     /** Called by child edit screens after they save, so our list reflects changes immediately. */
