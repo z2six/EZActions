@@ -1,0 +1,14 @@
+// MainFile: src/main/resources/ezactions.mixins.json
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "org.z2six.ezactions.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "NoBlurGameRendererMixin",
+    "KeyboardHandlerAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
