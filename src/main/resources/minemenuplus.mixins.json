@@ -1,16 +1,14 @@
+// MainFile: src/main/resources/minemenuplus.mixins.json
 {
   "required": true,
   "minVersion": "0.8",
   "package": "org.z2six.minemenuplus.mixin",
   "compatibilityLevel": "JAVA_21",
-  "mixins": [
-  ],
   "client": [
+    "NoBlurGameRendererMixin",
+    "KeyboardHandlerAccessor"
   ],
   "injectors": {
     "defaultRequire": 1
-  },
-  "overwrites": {
-    "requireAnnotations": true
   }
 }
