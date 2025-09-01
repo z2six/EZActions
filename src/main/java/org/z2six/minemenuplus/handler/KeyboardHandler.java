@@ -41,11 +41,10 @@ public final class KeyboardHandler {
             // HOLD logic (read physical state)
             boolean heldNow = isPhysicallyDown(mc, MineMenuKeybinds.OPEN_MENU);
 
-            // rising edge → open at root
+            // rising edge → open at root (no disk reload every time)
             if (heldNow && !openHeldPrev && !suppressUntilRelease) {
                 Constants.LOG.debug("[{}] Radial hotkey pressed; opening at root.", Constants.MOD_NAME);
-                RadialMenu.reload();
-                mc.setScreen(new RadialMenuScreen());
+                RadialMenu.open();
             }
 
             // falling edge → let the screen decide (release-to-activate)

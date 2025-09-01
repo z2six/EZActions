@@ -1,3 +1,4 @@
+// src/main/java/org/z2six/minemenuplus/gui/RadialScreenMath.java
 package org.z2six.minemenuplus.gui;
 
 import org.z2six.minemenuplus.Constants;
@@ -27,8 +28,9 @@ public final class RadialScreenMath {
     public record Radii(double inner, double outer, int deadzone) {}
 
     /**
-     * Pick sector index or -1 if the cursor is inside deadzone or way outside.
+     * Pick sector index or -1 if the cursor is inside the inner deadzone.
      * Angles start at the top (12 o'clock) and increase clockwise.
+     * NOTE: No outer deadzone anymore — any distance beyond the ring still maps to a sector.
      */
     public static int pickSector(double mouseX, double mouseY, int cx, int cy, int sectors, Radii rr) {
         try {
@@ -39,8 +41,6 @@ public final class RadialScreenMath {
             double dist2 = dx * dx + dy * dy;
 
             if (dist2 < (double) rr.deadzone() * rr.deadzone()) return -1;
-            double maxR = rr.outer() * 1.35; // tolerant outer bound
-            if (dist2 > maxR * maxR) return -1;
 
             double ang = Math.atan2(dy, dx); // [-pi, +pi], 0 on +X
             ang += Math.PI / 2.0;            // 0 at top

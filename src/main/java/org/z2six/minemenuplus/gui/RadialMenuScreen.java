@@ -5,9 +5,12 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.z2six.minemenuplus.Constants;
+import org.z2six.minemenuplus.config.RadialAnimConfigView;
 import org.z2six.minemenuplus.data.menu.MenuItem;
 import org.z2six.minemenuplus.data.menu.RadialMenu;
 import org.z2six.minemenuplus.gui.RadialScreenMath.Radii;
+import org.z2six.minemenuplus.gui.anim.RadialTransition;
+import org.z2six.minemenuplus.gui.anim.SliceHoverAnim;
 import org.z2six.minemenuplus.handler.KeyboardHandler;
 import org.z2six.minemenuplus.gui.noblur.NoMenuBlurScreen;
 
@@ -15,14 +18,18 @@ import java.util.List;
 
 /**
  * Radial menu:
- * - No screen overlay, game continues; mouse captured for selection.
  * - Hold-to-open. Release = execute hovered action (non-category).
+ * - Game continues; mouse is used for selection.
  * - LMB on action: close+execute; LMB on category: drill in (stay open).
  * - RMB: go back.
  */
 public final class RadialMenuScreen extends Screen implements NoMenuBlurScreen {
 
     private int hoveredIndex = -1;
+
+    // Anim state (open/close + hover)
+    private final RadialTransition openTrans = new RadialTransition();
+    private final SliceHoverAnim hoverAnim = new SliceHoverAnim();
 
     public RadialMenuScreen() {
         super(Component.literal("MineMenuPlus Radial"));
@@ -31,12 +38,12 @@ public final class RadialMenuScreen extends Screen implements NoMenuBlurScreen {
     @Override
     protected void init() {
         super.init();
+        // Start open wipe (config will gate its usage during render)
+        openTrans.start(+1);
     }
 
     @Override
-    public boolean isPauseScreen() {
-        return false;
-    }
+    public boolean isPauseScreen() { return false; }
 
     /** Called by KeyboardHandler on hotkey release (falling edge). */
     public void onHotkeyReleased() {
@@ -46,13 +53,11 @@ public final class RadialMenuScreen extends Screen implements NoMenuBlurScreen {
                     && hoveredIndex >= 0 && hoveredIndex < items.size()) {
                 MenuItem mi = items.get(hoveredIndex);
                 if (!mi.isCategory()) {
-                    // Execute action on release
                     KeyboardHandler.suppressReopenUntilReleased();
                     executeAndClose(mi);
                     return;
                 }
             }
-            // Nothing actionable hovered → just close
             Minecraft.getInstance().setScreen(null);
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] onHotkeyReleased error: {}", Constants.MOD_NAME, t.toString());
@@ -63,23 +68,32 @@ public final class RadialMenuScreen extends Screen implements NoMenuBlurScreen {
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         try {
-            // No backdrop fill: game remains fully visible
             List<MenuItem> items = RadialMenu.currentItems();
-            int cx = this.width / 2;
-            int cy = this.height / 2;
+            final int cx = this.width / 2;
+            final int cy = this.height / 2;
 
-            Radii rr = RadialScreenMath.computeRadii(items == null ? 0 : items.size());
+            final int count = (items == null) ? 0 : items.size();
+            final Radii rr = RadialScreenMath.computeRadii(count);
 
-            hoveredIndex = (items == null || items.isEmpty())
+            hoveredIndex = (count <= 0)
                     ? -1
-                    : RadialScreenMath.pickSector(mouseX, mouseY, cx, cy, items.size(), rr);
+                    : RadialScreenMath.pickSector(mouseX, mouseY, cx, cy, count, rr);
 
-            RadialScreenDraw.drawRing(g, this.font, cx, cy, items, hoveredIndex, rr);
+            // Tick hover animation state
+            hoverAnim.tick(System.currentTimeMillis(), hoveredIndex, count);
+
+            // Decide open/close progress via config
+            final RadialAnimConfigView view = RadialAnimConfigView.get();
+            final float openProg = (view.animationsEnabled && view.animOpenClose)
+                    ? openTrans.progress()
+                    : 1.0f;
+
+            // Draw ring with animations wired in
+            RadialScreenDraw.drawRing(g, this.font, cx, cy, items, hoveredIndex, rr, hoverAnim, openProg);
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] Radial render error: {}", Constants.MOD_NAME, t.toString());
         }
 
-        // DO NOT draw any hint text in the center
         super.render(g, mouseX, mouseY, partialTick);
     }
 
@@ -107,6 +121,7 @@ public final class RadialMenuScreen extends Screen implements NoMenuBlurScreen {
                     this.minecraft.setScreen(new RadialMenuScreen());
                     return true;
                 } else {
+                    KeyboardHandler.suppressReopenUntilReleased();
                     executeAndClose(mi);
                     return true;
                 }
