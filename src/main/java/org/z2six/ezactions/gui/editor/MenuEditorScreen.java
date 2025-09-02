@@ -24,7 +24,7 @@ import java.util.Objects;
  * Menu Editor (main options screen).
  * - Left: action buttons (add key/command/category, edit, remove)
  * - Right: list of items. Categories show as "(RMB to open) Name". RMB enters category; LMB selects/drag.
- * - When inside a category, a red "Back" pseudo-row appears on top; clicking it goes to parent.
+ * - When inside a category, a white breadcrumb row appears above a red "Back" row; clicking Back goes to parent.
  * - Drag & drop to reorder, with a blue insertion indicator line.
  * - Scrollbar & mouse wheel supported (like pickers).
  * - All mutations are persisted via RadialMenu helpers.
@@ -82,6 +82,7 @@ public final class MenuEditorScreen extends Screen {
     // --- Row model -----------------------------------------------------------
 
     private sealed interface Row {
+        record BreadcrumbRow(String path) implements Row {}
         record BackRow() implements Row {}
         record ItemRow(MenuItem item) implements Row {}
     }
@@ -116,7 +117,18 @@ public final class MenuEditorScreen extends Screen {
     private void rebuildRows() {
         rows.clear();
         if (!atRoot()) {
-            rows.add(new Row.BackRow());
+            // Breadcrumb path from RadialMenu (defensive fallback to "root")
+            String path = "root";
+            try {
+                List<String> parts = org.z2six.ezactions.data.menu.RadialMenu.pathTitles();
+                if (parts != null && !parts.isEmpty()) {
+                    path = String.join("/", parts);
+                }
+            } catch (Throwable t) {
+                Constants.LOG.debug("[{}] Breadcrumb build failed: {}", Constants.MOD_NAME, t.toString());
+            }
+            rows.add(new Row.BreadcrumbRow(path)); // white label
+            rows.add(new Row.BackRow());           // red clickable back
         }
         String q = filterBox != null ? filterBox.getValue().trim().toLowerCase(Locale.ROOT) : "";
         for (MenuItem mi : current()) {
@@ -182,7 +194,7 @@ public final class MenuEditorScreen extends Screen {
     private int rowToContentIndex(int rowIdx) {
         if (rowIdx < 0 || rowIdx >= rows.size()) return -1;
         Row r = rows.get(rowIdx);
-        if (r instanceof Row.BackRow) return -1;
+        if (r instanceof Row.BackRow || r instanceof Row.BreadcrumbRow) return -1;
         int count = 0;
         for (int i = 0; i < rows.size(); i++) {
             Row rr = rows.get(i);
@@ -365,7 +377,7 @@ public final class MenuEditorScreen extends Screen {
     private void onRemoveSelected() {
         if (selectedRow < 0 || selectedRow >= rows.size()) return;
         Row r = rows.get(selectedRow);
-        if (r instanceof Row.BackRow) return;
+        if (r instanceof Row.BackRow || r instanceof Row.BreadcrumbRow) return;
 
         MenuItem mi = ((Row.ItemRow) r).item();
         String id = mi.id();
@@ -399,23 +411,28 @@ public final class MenuEditorScreen extends Screen {
 
         hoveredRow = mouseToRow(mouseY);
 
-        // Rows
         for (int i = first; i <= last; i++) {
             int y = listTop + (i * ROW_H) - (int)scrollY;
             if (y + ROW_H < listTop || y > listTop + listHeight) continue;
 
-            boolean sel = (i == selectedRow);
-            boolean hov = (i == hoveredRow);
+            Row r = rows.get(i);
+            boolean isBreadcrumb = (r instanceof Row.BreadcrumbRow);
+            boolean isBack = (r instanceof Row.BackRow);
+
+            boolean sel = (i == selectedRow) && !isBreadcrumb; // don't highlight breadcrumb
+            boolean hov = (i == hoveredRow) && !isBreadcrumb;
 
             if (sel) g.fill(listLeft, y, listLeft + listWidth, y + ROW_H, HILITE);
             else if (hov) g.fill(listLeft, y, listLeft + listWidth, y + ROW_H, ROW_BG);
 
-            Row r = rows.get(i);
-            if (r instanceof Row.BackRow) {
+            if (isBreadcrumb) {
+                String txt = ((Row.BreadcrumbRow) r).path();
+                g.drawString(this.font, txt, listLeft + 8, y + (ROW_H - 9) / 2, 0xFFFFFFFF);
+            } else if (isBack) {
                 String txt = ChatFormatting.RED + "Back";
                 g.drawString(this.font, txt, listLeft + 8, y + (ROW_H - 9) / 2, 0xFF0000);
-            } else if (r instanceof Row.ItemRow ir) {
-                MenuItem mi = ir.item();
+            } else {
+                MenuItem mi = ((Row.ItemRow) r).item();
                 int textX = listLeft + 8;
 
                 IconSpec icon = mi.icon();
@@ -448,6 +465,8 @@ public final class MenuEditorScreen extends Screen {
                 g.drawString(this.font, name, listLeft + 8, yGhost + (ROW_H - 9) / 2, 0xFFFFFF);
             } else if (r instanceof Row.BackRow) {
                 g.drawString(this.font, ChatFormatting.RED + "Back", listLeft + 8, yGhost + (ROW_H - 9) / 2, 0xFF0000);
+            } else if (r instanceof Row.BreadcrumbRow br) {
+                g.drawString(this.font, br.path(), listLeft + 8, yGhost + (ROW_H - 9) / 2, 0xFFFFFFFF);
             }
 
             if (dropAt >= 0) {
@@ -456,7 +475,7 @@ public final class MenuEditorScreen extends Screen {
             }
         }
 
-        // Scrollbar (like pickers)
+        // Scrollbar
         drawScrollbar(g);
 
         super.render(g, mouseX, mouseY, partialTick);
@@ -506,10 +525,16 @@ public final class MenuEditorScreen extends Screen {
         if (inList) {
             int idx = mouseToRow(mouseY);
             if (idx >= 0 && idx < rowCount()) {
+                Row r = rows.get(idx);
+
+                // NEW: ignore clicks on breadcrumb (non-interactive)
+                if (r instanceof Row.BreadcrumbRow) {
+                    return true;
+                }
+
                 selectedRow = idx;
                 ensureSelectedVisible();
 
-                Row r = rows.get(idx);
                 if (button == 1) {
                     // RMB: Back or enter category
                     if (r instanceof Row.BackRow) {
@@ -536,7 +561,7 @@ public final class MenuEditorScreen extends Screen {
                         selectedRow = -1;
                         rebuildRows();
                         return true;
-                    } else {
+                    } else if (r instanceof Row.ItemRow) {
                         // Start drag
                         dragging = true;
                         dragRowIdx = idx;
@@ -553,13 +578,18 @@ public final class MenuEditorScreen extends Screen {
 
     private int computeDropAt(double mouseY) {
         int raw = mouseToRow(mouseY);
+        int header = atRoot() ? 0 : 2; // breadcrumb + back when not at root
         if (raw < 0) {
-            if (mouseY < listTop) return atRoot() ? 0 : 1;
+            if (mouseY < listTop) return header; // clamp to first content row
             if (mouseY > listTop + rowCount() * ROW_H) return rowCount();
             return -1;
         }
+        // Never insert within the header block; clamp to first item row
+        if (raw < header) return header;
+
         int within = (int)mouseY - (listTop + (raw * ROW_H) - (int)scrollY);
-        return (within < ROW_H / 2) ? raw : (raw + 1);
+        int pos = (within < ROW_H / 2) ? raw : (raw + 1);
+        return Math.max(header, pos);
     }
 
     @Override
