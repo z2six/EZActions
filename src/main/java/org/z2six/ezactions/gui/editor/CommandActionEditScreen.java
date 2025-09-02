@@ -44,8 +44,14 @@ public final class CommandActionEditScreen extends Screen {
         if (editing != null && editing.action() instanceof ClickActionCommand cc) {
             this.draftTitle = safe(editing.title());
 
-            // Try hard to retrieve the command string from the action, but don't require any specific API.
-            String extracted = tryExtractCommandString(cc);
+            // Prefer direct API (added in ClickActionCommand); fall back to old reflection.
+            String extracted = "";
+            try {
+                extracted = cc.getCommand();
+            } catch (Throwable ignored) {}
+            if (extracted == null || extracted.isEmpty()) {
+                extracted = tryExtractCommandString(cc);
+            }
             if (!extracted.isEmpty()) this.draftCommand = extracted;
 
             if (editing.icon() != null) this.draftIcon = editing.icon();
@@ -54,7 +60,7 @@ public final class CommandActionEditScreen extends Screen {
 
     private static String safe(String s) { return s == null ? "" : s; }
 
-    /** Attempts to read the command string from a ClickActionCommand with best-effort reflection. */
+    /** Attempts to read the command string from a ClickActionCommand (legacy reflection fallback). */
     private static String tryExtractCommandString(ClickActionCommand cc) {
         // 1) Method candidates
         String[] methodNames = { "command", "getCommand", "getCmd", "cmd" };
@@ -66,7 +72,7 @@ public final class CommandActionEditScreen extends Screen {
             } catch (Throwable ignored) {}
         }
         // 2) Field candidates
-        String[] fieldNames = { "command", "cmd" };
+        String[] fieldNames = { "command", "cmd", "commandRaw" };
         for (String fname : fieldNames) {
             try {
                 Field f = cc.getClass().getDeclaredField(fname);
@@ -75,7 +81,6 @@ public final class CommandActionEditScreen extends Screen {
                 if (v instanceof String s && !s.isEmpty()) return s;
             } catch (Throwable ignored) {}
         }
-        // 3) Nothing found
         return "";
     }
 
@@ -158,8 +163,24 @@ public final class CommandActionEditScreen extends Screen {
         g.fill(12, 52, this.width - 12, this.height - 36, 0xC0101010);
 
         g.drawCenteredString(this.font, this.title.getString(), this.width / 2, 14, 0xFFFFFF);
-        g.drawString(this.font, "Title:", this.width / 2 - 160, 34, 0xA0A0A0);
-        g.drawString(this.font, "Command:", this.width / 2 - 160, 62, 0xA0A0A0);
+
+        // Labels positioned relative to the text boxes to keep spacing clean
+        int titleLabelX = this.width / 2 - 160;
+        int cmdLabelX   = titleLabelX;
+
+        int titleLabelY = (titleBox != null ? titleBox.getY() : 48) - 14; // above title box
+        if (titleLabelY < 8) titleLabelY = 8;
+
+        int cmdLabelY = (cmdBox != null ? cmdBox.getY() : 76) - 14;        // above command box
+        // Extra breathing room vs. the title box bottom:
+        // ensure the command label is at least 6px below the bottom of the title box
+        if (titleBox != null) {
+            int minCmdLabelY = titleBox.getY() + titleBox.getHeight() + 6;
+            if (cmdLabelY < minCmdLabelY) cmdLabelY = minCmdLabelY;
+        }
+
+        g.drawString(this.font, "Title:",   titleLabelX, titleLabelY, 0xA0A0A0);
+        g.drawString(this.font, "Command:", cmdLabelX,   cmdLabelY,   0xA0A0A0);
 
         // Icon preview box (top-right)
         int boxW = 60, boxH = 60;

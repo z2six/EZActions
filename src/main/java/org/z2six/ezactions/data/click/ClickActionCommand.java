@@ -22,11 +22,22 @@ public final class ClickActionCommand implements IClickAction {
         this.commandRaw = command == null ? "" : command.trim();
     }
 
+    // --- NEW: expose the stored command for editors/serialization helpers ----
+
+    /** Returns the command exactly as stored (may include leading '/'). */
+    public String getCommand() {
+        return this.commandRaw;
+    }
+
+    /** Alias for reflection-based callers that look for "command()". */
+    public String command() {
+        return this.commandRaw;
+    }
+
     // --- IClickAction --------------------------------------------------------
 
     @Override
     public String getId() {
-        // Short, stable id for logs/tooltips
         String base = commandRaw.isEmpty() ? "<empty>" : commandRaw;
         return "cmd:" + base;
     }
@@ -38,7 +49,6 @@ public final class ClickActionCommand implements IClickAction {
 
     @Override
     public Component getDisplayName() {
-        // Show the command (trimmed), but don’t spam UI with leading slash
         String s = normalized();
         return Component.literal(s.isEmpty() ? "(empty)" : s);
     }
@@ -62,7 +72,6 @@ public final class ClickActionCommand implements IClickAction {
                 return false;
             }
 
-            // Ensure we’re on the client thread; this path signs arguments as needed.
             mc.execute(() -> {
                 try {
                     player.connection.sendCommand(cmd); // IMPORTANT: no leading '/'
