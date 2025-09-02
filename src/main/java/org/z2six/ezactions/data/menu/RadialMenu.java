@@ -23,9 +23,27 @@ public final class RadialMenu {
     /** Open the radial as a Screen, always starting at ROOT. */
     public static void open() {
         try {
+            // --- Guard: only open while actively playing (no GUI, not paused, world ready) ---
+            final Minecraft mc = Minecraft.getInstance();
+            if (mc == null || mc.player == null || mc.level == null) {
+                Constants.LOG.debug("[{}] Radial open ignored: client/world not ready (mc={}, player={}, level={}).",
+                        Constants.MOD_NAME,
+                        (mc != null),
+                        (mc != null && mc.player != null),
+                        (mc != null && mc.level != null));
+                return;
+            }
+            if (mc.screen != null || mc.isPaused()) {
+                final String scr = (mc.screen == null) ? "none" : mc.screen.getClass().getSimpleName();
+                Constants.LOG.debug("[{}] Radial open ignored: screen={}, paused={}",
+                        Constants.MOD_NAME, scr, mc.isPaused());
+                return;
+            }
+            // -------------------------------------------------------------------------------
+
             ensureLoaded();
             PATH.clear(); // important: always open at root
-            Minecraft.getInstance().setScreen(new RadialMenuScreen());
+            mc.setScreen(new RadialMenuScreen());
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] Failed to open radial: {}", Constants.MOD_NAME, t.toString());
         }
