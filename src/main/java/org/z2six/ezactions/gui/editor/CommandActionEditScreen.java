@@ -8,6 +8,7 @@ import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.z2six.ezactions.Constants;
+import org.z2six.ezactions.config.GeneralClientConfig;
 import org.z2six.ezactions.data.click.ClickActionCommand;
 import org.z2six.ezactions.data.icon.IconSpec;
 import org.z2six.ezactions.data.menu.MenuItem;
@@ -19,7 +20,7 @@ import java.lang.reflect.Method;
 
 /**
  * Editor for "run command" items.
- * - Command box is multi-line (~5 lines), scrollable; one command per line.
+ * - Command box is multi-line (configurable visible lines via general-client.toml), scrollable; one command per line.
  * - Optional "multi-command delay" (ticks) below the command box; blank => 0.
  * - Preserves typed title/command while opening child pickers
  * - Shows live icon preview
@@ -128,13 +129,24 @@ public final class CommandActionEditScreen extends Screen {
         titleBox.setResponder(s -> draftTitle = safe(s));
         addRenderableWidget(titleBox);
 
-        // Multi-line Command input (~5 lines tall, with internal scrollbar)
-        final int LINES = 5;
+        // Read desired visible lines for command box from config (defensive)
+        int cfgLines = 5;
+        try {
+            cfgLines = GeneralClientConfig.CONFIG.commandEditorVisibleLines();
+        } catch (Throwable t) {
+            Constants.LOG.debug("[{}] commandEditorVisibleLines read failed; using default 5: {}", Constants.MOD_NAME, t.toString());
+            cfgLines = 5;
+        }
+        // Hard clamp safety (should already be clamped in getter)
+        if (cfgLines < 1) cfgLines = 1;
+        if (cfgLines > 20) cfgLines = 20;
+
+        // Multi-line Command input (configurable visible lines), with internal scrollbar
         final int V_PADDING = 6;       // small vertical padding inside the widget
         final int LABEL_ABOVE = 14;    // space for label above the box
         final int GAP_BELOW_TITLE = 8; // desired gap between Title box bottom and "Command:" label baseline
 
-        int cmdH = this.font.lineHeight * LINES + V_PADDING;
+        int cmdH = this.font.lineHeight * cfgLines + V_PADDING;
         int cmdY = titleBox.getY() + titleBox.getHeight() + GAP_BELOW_TITLE + LABEL_ABOVE;
 
         // 1.21.x ctor: (Font, x, y, w, h, message, initialText)
@@ -149,10 +161,7 @@ public final class CommandActionEditScreen extends Screen {
         cmdBox.setValueListener(s -> draftCommand = safe(s));
         addRenderableWidget(cmdBox);
 
-        // Delay field directly below the command box
-        // Keep the SAME vertical rhythm as Title→Command (i.e., label baseline = previous box bottom + GAP_BELOW_TITLE)
-        // label baseline is delayBoxY - LABEL_ABOVE, so:
-        // (delayBoxY - LABEL_ABOVE) - (cmdY + cmdH) = GAP_BELOW_TITLE  => delayBoxY = cmdY + cmdH + LABEL_ABOVE + GAP_BELOW_TITLE
+        // Delay field directly below the command box (keep the same vertical rhythm)
         int delayY = cmdY + cmdH + LABEL_ABOVE + GAP_BELOW_TITLE;
 
         delayBox = new EditBox(this.font, cx - 160, delayY, 80, 20, Component.literal("Delay (ticks)"));
