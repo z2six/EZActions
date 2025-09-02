@@ -130,14 +130,14 @@ public final class CommandActionEditScreen extends Screen {
 
         // Multi-line Command input (~5 lines tall, with internal scrollbar)
         final int LINES = 5;
-        final int V_PADDING = 6; // small vertical padding inside the widget
-        final int LABEL_ABOVE = 14; // space for label above the box
-        final int GAP_BELOW_TITLE = 8;
+        final int V_PADDING = 6;       // small vertical padding inside the widget
+        final int LABEL_ABOVE = 14;    // space for label above the box
+        final int GAP_BELOW_TITLE = 8; // desired gap between Title box bottom and "Command:" label baseline
 
         int cmdH = this.font.lineHeight * LINES + V_PADDING;
         int cmdY = titleBox.getY() + titleBox.getHeight() + GAP_BELOW_TITLE + LABEL_ABOVE;
 
-        // NOTE: 1.21.x ctor requires (Font, x, y, w, h, message, initialText)
+        // 1.21.x ctor: (Font, x, y, w, h, message, initialText)
         cmdBox = new MultiLineEditBox(
                 this.font,
                 cx - 160, cmdY, 320, cmdH,
@@ -150,8 +150,12 @@ public final class CommandActionEditScreen extends Screen {
         addRenderableWidget(cmdBox);
 
         // Delay field directly below the command box
-        int y = cmdY + cmdH + 12;
-        delayBox = new EditBox(this.font, cx - 160, y, 80, 20, Component.literal("Delay (ticks)"));
+        // Keep the SAME vertical rhythm as Title→Command (i.e., label baseline = previous box bottom + GAP_BELOW_TITLE)
+        // label baseline is delayBoxY - LABEL_ABOVE, so:
+        // (delayBoxY - LABEL_ABOVE) - (cmdY + cmdH) = GAP_BELOW_TITLE  => delayBoxY = cmdY + cmdH + LABEL_ABOVE + GAP_BELOW_TITLE
+        int delayY = cmdY + cmdH + LABEL_ABOVE + GAP_BELOW_TITLE;
+
+        delayBox = new EditBox(this.font, cx - 160, delayY, 80, 20, Component.literal("Delay (ticks)"));
         delayBox.setValue(this.draftDelayTicks > 0 ? Integer.toString(this.draftDelayTicks) : "");
         delayBox.setResponder(s -> {
             try {
@@ -162,7 +166,8 @@ public final class CommandActionEditScreen extends Screen {
             }
         });
         addRenderableWidget(delayBox);
-        y += 28;
+
+        int y = delayY + 28; // push everything below accordingly
 
         // Icon picker
         addRenderableWidget(Button.builder(Component.literal("Choose Icon"), b -> {
@@ -234,13 +239,14 @@ public final class CommandActionEditScreen extends Screen {
         g.drawCenteredString(this.font, this.title.getString(), this.width / 2, 14, 0xFFFFFF);
 
         // Labels drawn directly above their boxes
+        final int LABEL_ABOVE = 14;
         int labelX = this.width / 2 - 160;
-        g.drawString(this.font, "Title:",   labelX, (titleBox != null ? titleBox.getY() : 48) - 14, 0xA0A0A0);
-        g.drawString(this.font, "Command:", labelX, (cmdBox   != null ? cmdBox.getY()   : 76) - 14, 0xA0A0A0);
+        g.drawString(this.font, "Title:",   labelX, (titleBox != null ? titleBox.getY() : 48) - LABEL_ABOVE, 0xA0A0A0);
+        g.drawString(this.font, "Command:", labelX, (cmdBox   != null ? cmdBox.getY()   : 76) - LABEL_ABOVE, 0xA0A0A0);
 
         // Delay label above delay box (aligned left with the command box)
         if (delayBox != null) {
-            g.drawString(this.font, "Multi-command delay (ticks):", labelX, delayBox.getY() - 14, 0xA0A0A0);
+            g.drawString(this.font, "Multi-command delay (ticks):", labelX, delayBox.getY() - LABEL_ABOVE, 0xA0A0A0);
         }
 
         // Icon preview box (top-right)
