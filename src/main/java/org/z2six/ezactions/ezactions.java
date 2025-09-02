@@ -20,16 +20,21 @@ public final class ezactions {
     public ezactions(IEventBus modBus, ModContainer modContainer) {
         Constants.LOG.info("[{}] Initializing … (client? {})", Constants.MOD_NAME, FMLEnvironment.dist == Dist.CLIENT);
 
-        // Register CLIENT config (anim-client.toml) – already working for you
+        // Register CLIENT configs
         try {
             modContainer.registerConfig(
                     ModConfig.Type.CLIENT,
                     org.z2six.ezactions.config.RadialAnimConfig.SPEC,
                     "ezactions/anim-client.toml"
             );
-            Constants.LOG.debug("[{}] Registered CLIENT config spec at config/ezactions/anim-client.toml", Constants.MOD_NAME);
+            modContainer.registerConfig(
+                    ModConfig.Type.CLIENT,
+                    org.z2six.ezactions.config.GeneralClientConfig.SPEC,
+                    "ezactions/general-client.toml"
+            );
+            Constants.LOG.debug("[{}] Registered CLIENT config specs (anim-client.toml, general-client.toml).", Constants.MOD_NAME);
         } catch (Throwable t) {
-            Constants.LOG.warn("[{}] Failed to register CLIENT config: {}", Constants.MOD_NAME, t.toString());
+            Constants.LOG.warn("[{}] Failed to register CLIENT configs: {}", Constants.MOD_NAME, t.toString());
         }
 
         try {
@@ -44,7 +49,7 @@ public final class ezactions {
             // GAME bus (global): client tick listeners
             if (FMLEnvironment.dist == Dist.CLIENT) {
                 NeoForge.EVENT_BUS.addListener(KeyboardHandler::onClientTickPre);
-                NeoForge.EVENT_BUS.addListener(KeyboardHandler::onClientTickPost); // NEW: makes movement stick
+                NeoForge.EVENT_BUS.addListener(KeyboardHandler::onClientTickPost);
                 Constants.LOG.debug("[{}] Registered GAME-bus listeners (Pre & Post).", Constants.MOD_NAME);
             }
         } catch (Throwable t) {

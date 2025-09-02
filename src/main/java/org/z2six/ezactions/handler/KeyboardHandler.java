@@ -15,18 +15,21 @@ import org.z2six.ezactions.helper.InputInjector;
 import org.z2six.ezactions.helper.KeyboardHandlerHelper;
 import org.z2six.ezactions.util.EZActionsKeybinds;
 
-// NeoForge conflict-context API
+// conflict contexts
 import net.neoforged.neoforge.client.settings.IKeyConflictContext;
 import net.neoforged.neoforge.client.settings.KeyConflictContext;
 
+// general config toggle
+import org.z2six.ezactions.config.GeneralClientConfig;
+
 /**
- * HOLD-to-open radial with movement passthrough.
+ * HOLD-to-open radial with optional movement passthrough (toggle in general-client.toml).
  *
- * Key points:
- * - We mirror physical key state (GLFW) into KeyMapping#setDown while the radial screen is open.
- * - Additionally, we temporarily switch movement keys' conflict context to UNIVERSAL while the
- *   radial screen is open; otherwise IN_GAME keys are inactive during GUI screens.
- * - We restore original contexts on close, and we never crash (errors are logged + skipped).
+ * - If moveWhileRadialOpen is true (default), we:
+ *     * push movement keys' conflict context to UNIVERSAL while the radial is open
+ *     * mirror physical key state into KeyMapping#setDown during PRE and POST ticks
+ * - If false, we do not alter contexts or mirror movement keys.
+ * - Always restores original contexts on close. Never crashes; logs and skips on errors.
  */
 public final class KeyboardHandler {
 
@@ -35,7 +38,6 @@ public final class KeyboardHandler {
     private static boolean openHeldPrev = false;
     private static boolean suppressUntilRelease = false;
 
-    // --- conflict-context push/pop state ---
     private static boolean contextsPushed = false;
     private static KeyMapping[] trackedKeys = null;
     private static IKeyConflictContext[] prevContexts = null;
@@ -45,7 +47,6 @@ public final class KeyboardHandler {
         suppressUntilRelease = true;
     }
 
-    /** Client tick (PRE): open/close edge detection and early-mirror (harmless). */
     public static void onClientTickPre(ClientTickEvent.Pre e) {
         try {
             ClientTaskQueue.drain();
@@ -54,7 +55,6 @@ public final class KeyboardHandler {
             final Minecraft mc = Minecraft.getInstance();
             if (mc == null || mc.player == null) return;
 
-            // HOTKEY hold logic
             boolean heldNow = isPhysicallyDown(mc, EZActionsKeybinds.OPEN_MENU);
 
             if (heldNow && !openHeldPrev && !suppressUntilRelease) {
@@ -63,29 +63,29 @@ public final class KeyboardHandler {
             }
 
             if (!heldNow && openHeldPrev) {
-                // hotkey released
                 if (mc.screen instanceof RadialMenuScreen s) {
-                    s.onHotkeyReleased(); // may execute & close
+                    s.onHotkeyReleased();
                 }
                 releaseMovementKeys(mc);
-                popMovementKeyContexts(mc); // restore IN_GAME contexts
+                popMovementKeyContexts(mc);
                 suppressUntilRelease = false;
             }
 
             openHeldPrev = heldNow;
 
-            // If our screen is open, ensure contexts are pushed and mirror movement
+            // Respect toggle: allow movement only if enabled
+            boolean allowMove = GeneralClientConfig.CONFIG.moveWhileRadialOpen();
             if (mc.screen instanceof RadialMenuScreen) {
-                pushMovementKeyContexts(mc); // makes movement keys active under a GUI
-                tickMovementPassthrough(mc);
-            } else {
-                // If screen changed away without a clean release, still restore
-                if (contextsPushed) {
-                    popMovementKeyContexts(mc);
+                if (allowMove) {
+                    pushMovementKeyContexts(mc);
+                    tickMovementPassthrough(mc);
+                } else {
+                    if (contextsPushed) popMovementKeyContexts(mc);
                 }
+            } else if (contextsPushed) {
+                popMovementKeyContexts(mc);
             }
 
-            // Editor key (unchanged)
             if (EZActionsKeybinds.OPEN_EDITOR != null && EZActionsKeybinds.OPEN_EDITOR.consumeClick()) {
                 mc.setScreen(new org.z2six.ezactions.gui.editor.MenuEditorScreen(mc.screen));
             }
@@ -94,13 +94,13 @@ public final class KeyboardHandler {
         }
     }
 
-    /** Client tick (POST): final pass so our mirrored state wins for the tick. */
     public static void onClientTickPost(ClientTickEvent.Post e) {
         try {
             final Minecraft mc = Minecraft.getInstance();
             if (mc == null || mc.player == null) return;
 
-            if (mc.screen instanceof RadialMenuScreen) {
+            boolean allowMove = GeneralClientConfig.CONFIG.moveWhileRadialOpen();
+            if (allowMove && mc.screen instanceof RadialMenuScreen) {
                 tickMovementPassthrough(mc);
             }
         } catch (Throwable t) {
@@ -108,7 +108,7 @@ public final class KeyboardHandler {
         }
     }
 
-    /* -------------------- physical key state -------------------- */
+    // --- physical key state helpers ---
 
     private static boolean isPhysicallyDown(Minecraft mc, KeyMapping mapping) {
         if (mapping == null || mc == null || mc.getWindow() == null) return false;
@@ -118,26 +118,18 @@ public final class KeyboardHandler {
         InputConstants.Key key = mapping.getKey();
         if (key == null) return false;
 
-        switch (key.getType()) {
+        return switch (key.getType()) {
             case KEYSYM -> {
                 int code = key.getValue();
-                if (code < 0) return false;
-                int state = GLFW.glfwGetKey(window, code);
-                return state == GLFW.GLFW_PRESS || state == GLFW.GLFW_REPEAT;
+                int state = (code >= 0) ? GLFW.glfwGetKey(window, code) : GLFW.GLFW_RELEASE;
+                yield state == GLFW.GLFW_PRESS || state == GLFW.GLFW_REPEAT;
             }
-            case MOUSE -> {
-                int btn = key.getValue();
-                if (btn < 0) return false;
-                int state = GLFW.glfwGetMouseButton(window, btn);
-                return state == GLFW.GLFW_PRESS;
-            }
-            default -> {
-                return false;
-            }
-        }
+            case MOUSE -> GLFW.glfwGetMouseButton(window, key.getValue()) == GLFW.GLFW_PRESS;
+            default -> false;
+        };
     }
 
-    /* -------------------- WASD passthrough -------------------- */
+    // --- movement passthrough ---
 
     private static void tickMovementPassthrough(Minecraft mc) {
         try {
@@ -149,7 +141,7 @@ public final class KeyboardHandler {
             mirrorKey(mc, o.keyRight);
             mirrorKey(mc, o.keyJump);
             mirrorKey(mc, o.keySprint);
-            mirrorKey(mc, o.keyShift); // sneak
+            mirrorKey(mc, o.keyShift);
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] Movement passthrough tick failed: {}", Constants.MOD_NAME, t.toString());
         }
@@ -157,26 +149,19 @@ public final class KeyboardHandler {
 
     private static void mirrorKey(Minecraft mc, KeyMapping km) {
         if (km == null) return;
-        final InputConstants.Key k = km.getKey();
-        if (k == null || k.getValue() < 0) {
-            InputInjector.setKeyPressed(km, false);
-            return;
-        }
-        long window = mc.getWindow() != null ? mc.getWindow().getWindow() : 0L;
-        if (window == 0L) {
-            InputInjector.setKeyPressed(km, false);
-            return;
-        }
-        boolean down;
-        if (k.getType() == InputConstants.Type.KEYSYM) {
-            int state = GLFW.glfwGetKey(window, k.getValue());
-            down = (state == GLFW.GLFW_PRESS) || (state == GLFW.GLFW_REPEAT);
-        } else if (k.getType() == InputConstants.Type.MOUSE) {
-            int state = GLFW.glfwGetMouseButton(window, k.getValue());
-            down = (state == GLFW.GLFW_PRESS);
-        } else {
-            down = false;
-        }
+        InputConstants.Key k = km.getKey();
+        if (k == null) { InputInjector.setKeyPressed(km, false); return; }
+        long window = (mc.getWindow() != null) ? mc.getWindow().getWindow() : 0L;
+        if (window == 0L) { InputInjector.setKeyPressed(km, false); return; }
+
+        boolean down = switch (k.getType()) {
+            case KEYSYM -> {
+                int state = GLFW.glfwGetKey(window, k.getValue());
+                yield (state == GLFW.GLFW_PRESS) || (state == GLFW.GLFW_REPEAT);
+            }
+            case MOUSE -> GLFW.glfwGetMouseButton(window, k.getValue()) == GLFW.GLFW_PRESS;
+            default -> false;
+        };
         InputInjector.setKeyPressed(km, down);
     }
 
@@ -194,29 +179,25 @@ public final class KeyboardHandler {
         } catch (Throwable ignored) {}
     }
 
-    /* -------------------- conflict context push/pop -------------------- */
+    // --- conflict context push/pop ---
 
-    /** Ensure movement keys are active under GUI by switching to UNIVERSAL while the radial is open. */
     private static void pushMovementKeyContexts(Minecraft mc) {
         if (contextsPushed) return;
         try {
             final Options o = mc.options;
             if (o == null) return;
 
-            trackedKeys = new KeyMapping[] {
-                    o.keyUp, o.keyDown, o.keyLeft, o.keyRight, o.keyJump, o.keySprint, o.keyShift
-            };
+            trackedKeys = new KeyMapping[] { o.keyUp, o.keyDown, o.keyLeft, o.keyRight, o.keyJump, o.keySprint, o.keyShift };
             prevContexts = new IKeyConflictContext[trackedKeys.length];
 
             for (int i = 0; i < trackedKeys.length; i++) {
                 KeyMapping km = trackedKeys[i];
                 if (km == null) continue;
                 try {
-                    IKeyConflictContext prev = km.getKeyConflictContext();
-                    prevContexts[i] = prev;
+                    prevContexts[i] = km.getKeyConflictContext();
                     km.setKeyConflictContext(KeyConflictContext.UNIVERSAL);
                 } catch (Throwable perKey) {
-                    Constants.LOG.debug("[{}] Could not push context for key {}: {}", Constants.MOD_NAME, i, perKey.toString());
+                    Constants.LOG.debug("[{}] Could not push context for movement key {}: {}", Constants.MOD_NAME, i, perKey.toString());
                 }
             }
             contextsPushed = true;
@@ -226,7 +207,6 @@ public final class KeyboardHandler {
         }
     }
 
-    /** Restore original conflict contexts for movement keys when the radial closes. */
     private static void popMovementKeyContexts(Minecraft mc) {
         if (!contextsPushed) return;
         try {
@@ -238,7 +218,7 @@ public final class KeyboardHandler {
                     try {
                         km.setKeyConflictContext(prev);
                     } catch (Throwable perKey) {
-                        Constants.LOG.debug("[{}] Could not pop context for key {}: {}", Constants.MOD_NAME, i, perKey.toString());
+                        Constants.LOG.debug("[{}] Could not pop context for movement key {}: {}", Constants.MOD_NAME, i, perKey.toString());
                     }
                 }
             }

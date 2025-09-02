@@ -62,11 +62,11 @@ public final class RadialScreenDraw {
                 double rInner = rr.inner();
                 double rOuter = rr.outer();
 
-                // Hover grow (pop-out) – outer-only expansion (snappy but simple)
+                // Hover grow (pop-out) – outer-only expansion
                 if (anim.animationsEnabled && anim.animHover && hover != null) {
                     float grow = clamp01(hover.scaleFor(i));  // 0..1
                     if (grow > 0f) {
-                        final double growPct = 0.05; // 5% enlargement at full grow
+                        final double growPct = 0.05; // keep consistent with view defaults
                         rOuter = rOuter * (1.0 + growPct * grow);
                     }
                 }
@@ -89,19 +89,16 @@ public final class RadialScreenDraw {
                 }
             }
 
-            // Hover colorization overlay — **inside→out radial fill** on the hovered slice
+            // Hover colorization overlay — inside→out radial fill on the hovered slice
             if (anim.animationsEnabled && anim.animHover && hover != null && hoveredIdx >= 0 && hoveredIdx < n) {
                 int i = hoveredIdx;
                 double a0 = (-Math.PI / 2.0) + i * step;
                 double a1 = a0 + step;
 
-                // Respect open/close wipe limits: clamp visible angular span if needed
                 if (anim.animOpenClose) {
-                    if (sweepLimit <= a0) {
-                        // not yet revealed → nothing to draw
-                    } else {
+                    if (sweepLimit > a0) {
                         if (sweepLimit < a1) a1 = sweepLimit;
-                        float sweep = clamp01(hover.sweepFor(i)); // reuse as radial factor 0..1
+                        float sweep = clamp01(hover.sweepFor(i)); // 0..1 radial factor
                         if (sweep > 0f) {
                             double rInner = rr.inner();
                             double rOuterFill = rInner + (rr.outer() - rInner) * sweep;
@@ -109,7 +106,7 @@ public final class RadialScreenDraw {
                         }
                     }
                 } else {
-                    float sweep = clamp01(hover.sweepFor(i)); // reuse as radial factor 0..1
+                    float sweep = clamp01(hover.sweepFor(hoveredIdx)); // 0..1 radial factor
                     if (sweep > 0f) {
                         double rInner = rr.inner();
                         double rOuterFill = rInner + (rr.outer() - rInner) * sweep;
@@ -127,7 +124,7 @@ public final class RadialScreenDraw {
                 if (anim.animationsEnabled && anim.animHover && hover != null) {
                     float grow = clamp01(hover.scaleFor(i));
                     if (grow > 0f) {
-                        final double growPct = 0.05; // keep in sync with slice grow
+                        final double growPct = 0.05; // in sync with slice grow
                         rMid = rMid * (1.0 + (growPct * 0.5) * grow);
                     }
                 }
@@ -136,6 +133,21 @@ public final class RadialScreenDraw {
                 int iy = cy + (int)Math.round(Math.sin(ang) * rMid);
                 if (i < items.size()) {
                     IconRenderer.drawIcon(g, ix, iy, items.get(i).icon());
+                }
+            }
+
+            // NEW: Center label for the currently hovered item (exact screen/radial center)
+            if (hoveredIdx >= 0 && hoveredIdx < items.size()) {
+                try {
+                    String label = items.get(hoveredIdx).title();
+                    if (label != null && !label.isEmpty()) {
+                        int tw = font.width(label);
+                        // draw centered horizontally; vertical baseline roughly centered
+                        g.drawString(font, label, cx - (tw / 2), cy - (font.lineHeight / 2), 0xFFFFFFFF, false);
+                    }
+                } catch (Throwable t) {
+                    // Skip label rendering if anything goes wrong; keep the UI alive
+                    Constants.LOG.debug("[{}] Center label draw failed: {}", Constants.MOD_NAME, t.toString());
                 }
             }
         } catch (Throwable t) {
