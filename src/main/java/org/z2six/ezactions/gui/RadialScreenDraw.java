@@ -1,3 +1,4 @@
+// MainFile: src/main/java/org/z2six/ezactions/gui/RadialScreenDraw.java
 package org.z2six.ezactions.gui;
 
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -65,7 +66,6 @@ public final class RadialScreenDraw {
                 if (anim.animationsEnabled && anim.animHover && hover != null) {
                     float grow = clamp01(hover.scaleFor(i));  // 0..1
                     if (grow > 0f) {
-                        // TEMP: constant while config grows; keep snappy.
                         final double growPct = 0.05; // 5% enlargement at full grow
                         rOuter = rOuter * (1.0 + growPct * grow);
                     }
@@ -89,26 +89,31 @@ public final class RadialScreenDraw {
                 }
             }
 
-            // Hover colorization wipe overlay (clockwise within the hovered slice)
+            // Hover colorization overlay — **inside→out radial fill** on the hovered slice
             if (anim.animationsEnabled && anim.animHover && hover != null && hoveredIdx >= 0 && hoveredIdx < n) {
                 int i = hoveredIdx;
                 double a0 = (-Math.PI / 2.0) + i * step;
                 double a1 = a0 + step;
 
+                // Respect open/close wipe limits: clamp visible angular span if needed
                 if (anim.animOpenClose) {
-                    if (sweepLimit > a0) {
+                    if (sweepLimit <= a0) {
+                        // not yet revealed → nothing to draw
+                    } else {
                         if (sweepLimit < a1) a1 = sweepLimit;
-                        float sweep = clamp01(hover.sweepFor(i)); // 0..1
+                        float sweep = clamp01(hover.sweepFor(i)); // reuse as radial factor 0..1
                         if (sweep > 0f) {
-                            double aMid = a0 + (a1 - a0) * sweep;
-                            fillRingSector(g, cx, cy, rr.inner(), rr.outer(), a0, aMid, cfg.hoverColor);
+                            double rInner = rr.inner();
+                            double rOuterFill = rInner + (rr.outer() - rInner) * sweep;
+                            fillRingSector(g, cx, cy, rInner, rOuterFill, a0, a1, cfg.hoverColor);
                         }
                     }
                 } else {
-                    float sweep = clamp01(hover.sweepFor(i)); // 0..1
+                    float sweep = clamp01(hover.sweepFor(i)); // reuse as radial factor 0..1
                     if (sweep > 0f) {
-                        double aMid = a0 + (a1 - a0) * sweep;
-                        fillRingSector(g, cx, cy, rr.inner(), rr.outer(), a0, aMid, cfg.hoverColor);
+                        double rInner = rr.inner();
+                        double rOuterFill = rInner + (rr.outer() - rInner) * sweep;
+                        fillRingSector(g, cx, cy, rInner, rOuterFill, a0, a1, cfg.hoverColor);
                     }
                 }
             }

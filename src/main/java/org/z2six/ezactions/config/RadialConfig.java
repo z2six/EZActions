@@ -24,7 +24,7 @@ public final class RadialConfig {
     public int scaleStartThreshold = 8;        // items before scaling
     public int scalePerItem = 6;               // px added per item above threshold
     public int ringColor = 0xAA000000;         // ARGB (semi-black)
-    public int hoverColor = 0xAAE53935;        // ARGB (semi-red)
+    public int hoverColor = 0xFFF20044;        // ARGB (semi-red)
 
     private RadialConfig() {}
 
