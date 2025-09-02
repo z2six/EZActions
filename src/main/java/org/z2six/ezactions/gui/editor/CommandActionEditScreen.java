@@ -4,6 +4,7 @@ package org.z2six.ezactions.gui.editor;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.z2six.ezactions.Constants;
@@ -18,6 +19,8 @@ import java.lang.reflect.Method;
 
 /**
  * Editor for "run command" items.
+ * - Command box is multi-line (~5 lines), scrollable; one command per line.
+ * - Optional "multi-command delay" (ticks) below the command box; blank => 0.
  * - Preserves typed title/command while opening child pickers
  * - Shows live icon preview
  * - Persists to current level on Save
@@ -28,13 +31,15 @@ public final class CommandActionEditScreen extends Screen {
     private final MenuItem editing; // null => add new
 
     // Draft state that survives pickers
-    private String draftTitle = "";
-    private String draftCommand = "/say hi";
-    private IconSpec draftIcon = IconSpec.item("minecraft:stone");
+    private String   draftTitle   = "";
+    private String   draftCommand = "/say hi";
+    private int      draftDelayTicks = 0;
+    private IconSpec draftIcon    = IconSpec.item("minecraft:stone");
 
     // Widgets
     private EditBox titleBox;
-    private EditBox cmdBox;
+    private MultiLineEditBox cmdBox;
+    private EditBox delayBox;
 
     public CommandActionEditScreen(Screen parent, MenuItem editing) {
         super(Component.literal(editing == null ? "Add Command" : "Edit Command"));
@@ -51,6 +56,11 @@ public final class CommandActionEditScreen extends Screen {
                 extracted = tryExtractCommandString(cc);
             }
             if (!extracted.isEmpty()) this.draftCommand = extracted;
+
+            int delay = 0;
+            try { delay = cc.getDelayTicks(); } catch (Throwable ignored) {}
+            if (delay <= 0) delay = tryExtractDelayTicks(cc);
+            this.draftDelayTicks = Math.max(0, delay);
 
             if (editing.icon() != null) this.draftIcon = editing.icon();
         }
@@ -82,6 +92,30 @@ public final class CommandActionEditScreen extends Screen {
         return "";
     }
 
+    /** Attempts to read delay ticks via reflection for older builds. */
+    private static int tryExtractDelayTicks(ClickActionCommand cc) {
+        // 1) Methods
+        String[] methods = { "getDelayTicks", "delayTicks", "getDelay", "delay" };
+        for (String mname : methods) {
+            try {
+                Method m = cc.getClass().getMethod(mname);
+                Object v = m.invoke(cc);
+                if (v instanceof Number n) return n.intValue();
+            } catch (Throwable ignored) {}
+        }
+        // 2) Fields
+        String[] fields = { "delayTicks", "delay", "ticksDelay" };
+        for (String fname : fields) {
+            try {
+                Field f = cc.getClass().getDeclaredField(fname);
+                f.setAccessible(true);
+                Object v = f.get(cc);
+                if (v instanceof Number n) return n.intValue();
+            } catch (Throwable ignored) {}
+        }
+        return 0;
+    }
+
     @Override
     protected void init() {
         int cx = this.width / 2;
@@ -94,18 +128,41 @@ public final class CommandActionEditScreen extends Screen {
         titleBox.setResponder(s -> draftTitle = safe(s));
         addRenderableWidget(titleBox);
 
-        // Place Command input LOWER so the "Command:" label (drawn above it) has extra breathing room
-        final int LABEL_ABOVE = 14;   // pixels label sits above its text box
-        final int EXTRA_GAP   = 8;    // extra space between Title box bottom and Command label
-        int cmdY = titleBox.getY() + titleBox.getHeight() + EXTRA_GAP + LABEL_ABOVE;
+        // Multi-line Command input (~5 lines tall, with internal scrollbar)
+        final int LINES = 5;
+        final int V_PADDING = 6; // small vertical padding inside the widget
+        final int LABEL_ABOVE = 14; // space for label above the box
+        final int GAP_BELOW_TITLE = 8;
 
-        cmdBox = new EditBox(this.font, cx - 160, cmdY, 320, 20, Component.literal("Command"));
-        cmdBox.setHint(Component.literal("Command (e.g., /time query)"));
-        cmdBox.setValue(draftCommand);
-        cmdBox.setResponder(s -> draftCommand = safe(s));
+        int cmdH = this.font.lineHeight * LINES + V_PADDING;
+        int cmdY = titleBox.getY() + titleBox.getHeight() + GAP_BELOW_TITLE + LABEL_ABOVE;
+
+        // NOTE: 1.21.x ctor requires (Font, x, y, w, h, message, initialText)
+        cmdBox = new MultiLineEditBox(
+                this.font,
+                cx - 160, cmdY, 320, cmdH,
+                Component.literal("Command"),
+                Component.literal(draftCommand)
+        );
+        cmdBox.setCharacterLimit(32767);       // effectively "no limit"
+        cmdBox.setValue(draftCommand);         // ensure exact initial value
+        cmdBox.setValueListener(s -> draftCommand = safe(s));
         addRenderableWidget(cmdBox);
 
-        int y = cmdY + 28;
+        // Delay field directly below the command box
+        int y = cmdY + cmdH + 12;
+        delayBox = new EditBox(this.font, cx - 160, y, 80, 20, Component.literal("Delay (ticks)"));
+        delayBox.setValue(this.draftDelayTicks > 0 ? Integer.toString(this.draftDelayTicks) : "");
+        delayBox.setResponder(s -> {
+            try {
+                int v = Integer.parseInt(s.trim());
+                draftDelayTicks = Math.max(0, v);
+            } catch (Throwable ignored) {
+                // leave draftDelayTicks unchanged if user is midway typing
+            }
+        });
+        addRenderableWidget(delayBox);
+        y += 28;
 
         // Icon picker
         addRenderableWidget(Button.builder(Component.literal("Choose Icon"), b -> {
@@ -128,7 +185,15 @@ public final class CommandActionEditScreen extends Screen {
     private void onSavePressed() {
         try {
             draftTitle   = safe(titleBox == null ? draftTitle : titleBox.getValue()).trim();
-            draftCommand = safe(cmdBox == null ? draftCommand : cmdBox.getValue()).trim();
+            draftCommand = safe(cmdBox   == null ? draftCommand : cmdBox.getValue()).trim();
+
+            // Parse delay; blank or invalid => 0
+            int delay = 0;
+            try {
+                String s = (delayBox == null) ? "" : delayBox.getValue().trim();
+                delay = s.isEmpty() ? 0 : Math.max(0, Integer.parseInt(s));
+            } catch (Throwable ignored) {}
+            draftDelayTicks = delay;
 
             if (draftTitle.isEmpty() || draftCommand.isEmpty()) {
                 Constants.LOG.warn("[{}] CommandEdit: Title or Command empty; ignoring save.", Constants.MOD_NAME);
@@ -139,7 +204,7 @@ public final class CommandActionEditScreen extends Screen {
                     editing != null ? editing.id() : MenuEditorScreen.freshId("cmd"),
                     draftTitle,
                     draftIcon,
-                    new ClickActionCommand(draftCommand),
+                    new ClickActionCommand(draftCommand, draftDelayTicks),
                     java.util.List.of()
             );
 
@@ -169,14 +234,14 @@ public final class CommandActionEditScreen extends Screen {
         g.drawCenteredString(this.font, this.title.getString(), this.width / 2, 14, 0xFFFFFF);
 
         // Labels drawn directly above their boxes
-        int titleLabelX = this.width / 2 - 160;
-        int cmdLabelX   = titleLabelX;
+        int labelX = this.width / 2 - 160;
+        g.drawString(this.font, "Title:",   labelX, (titleBox != null ? titleBox.getY() : 48) - 14, 0xA0A0A0);
+        g.drawString(this.font, "Command:", labelX, (cmdBox   != null ? cmdBox.getY()   : 76) - 14, 0xA0A0A0);
 
-        int titleLabelY = (titleBox != null ? titleBox.getY() : 48) - 14;
-        int cmdLabelY   = (cmdBox   != null ? cmdBox.getY()   : 76) - 14;
-
-        g.drawString(this.font, "Title:",   titleLabelX, titleLabelY, 0xA0A0A0);
-        g.drawString(this.font, "Command:", cmdLabelX,   cmdLabelY,   0xA0A0A0);
+        // Delay label above delay box (aligned left with the command box)
+        if (delayBox != null) {
+            g.drawString(this.font, "Multi-command delay (ticks):", labelX, delayBox.getY() - 14, 0xA0A0A0);
+        }
 
         // Icon preview box (top-right)
         int boxW = 60, boxH = 60;

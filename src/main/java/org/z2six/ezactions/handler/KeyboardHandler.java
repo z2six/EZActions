@@ -22,6 +22,9 @@ import net.neoforged.neoforge.client.settings.KeyConflictContext;
 // general config toggle
 import org.z2six.ezactions.config.GeneralClientConfig;
 
+// NEW: sequencer tick
+import org.z2six.ezactions.util.CommandSequencer;
+
 /**
  * HOLD-to-open radial with optional movement passthrough (toggle in general-client.toml).
  *
@@ -103,6 +106,10 @@ public final class KeyboardHandler {
             if (allowMove && mc.screen instanceof RadialMenuScreen) {
                 tickMovementPassthrough(mc);
             }
+
+            // NEW: run sequenced multi-commands (cheap no-op when idle)
+            CommandSequencer.tickClient();
+
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] Exception during onClientTickPost: {}", Constants.MOD_NAME, t.toString());
         }
