@@ -44,11 +44,9 @@ public final class CommandActionEditScreen extends Screen {
         if (editing != null && editing.action() instanceof ClickActionCommand cc) {
             this.draftTitle = safe(editing.title());
 
-            // Prefer direct API (added in ClickActionCommand); fall back to old reflection.
+            // Prefer direct API; fallback to reflection for older builds
             String extracted = "";
-            try {
-                extracted = cc.getCommand();
-            } catch (Throwable ignored) {}
+            try { extracted = cc.getCommand(); } catch (Throwable ignored) {}
             if (extracted == null || extracted.isEmpty()) {
                 extracted = tryExtractCommandString(cc);
             }
@@ -62,7 +60,7 @@ public final class CommandActionEditScreen extends Screen {
 
     /** Attempts to read the command string from a ClickActionCommand (legacy reflection fallback). */
     private static String tryExtractCommandString(ClickActionCommand cc) {
-        // 1) Method candidates
+        // 1) Methods
         String[] methodNames = { "command", "getCommand", "getCmd", "cmd" };
         for (String mname : methodNames) {
             try {
@@ -71,7 +69,7 @@ public final class CommandActionEditScreen extends Screen {
                 if (v instanceof String s && !s.isEmpty()) return s;
             } catch (Throwable ignored) {}
         }
-        // 2) Field candidates
+        // 2) Fields
         String[] fieldNames = { "command", "cmd", "commandRaw" };
         for (String fname : fieldNames) {
             try {
@@ -87,21 +85,27 @@ public final class CommandActionEditScreen extends Screen {
     @Override
     protected void init() {
         int cx = this.width / 2;
-        int y = 48;
 
-        titleBox = new EditBox(this.font, cx - 160, y, 320, 20, Component.literal("Title"));
+        // Title input
+        int titleY = 48;
+        titleBox = new EditBox(this.font, cx - 160, titleY, 320, 20, Component.literal("Title"));
         titleBox.setHint(Component.literal("Title (e.g., Say Time)"));
         titleBox.setValue(draftTitle);
         titleBox.setResponder(s -> draftTitle = safe(s));
         addRenderableWidget(titleBox);
-        y += 28;
 
-        cmdBox = new EditBox(this.font, cx - 160, y, 320, 20, Component.literal("Command"));
+        // Place Command input LOWER so the "Command:" label (drawn above it) has extra breathing room
+        final int LABEL_ABOVE = 14;   // pixels label sits above its text box
+        final int EXTRA_GAP   = 8;    // extra space between Title box bottom and Command label
+        int cmdY = titleBox.getY() + titleBox.getHeight() + EXTRA_GAP + LABEL_ABOVE;
+
+        cmdBox = new EditBox(this.font, cx - 160, cmdY, 320, 20, Component.literal("Command"));
         cmdBox.setHint(Component.literal("Command (e.g., /time query)"));
         cmdBox.setValue(draftCommand);
         cmdBox.setResponder(s -> draftCommand = safe(s));
         addRenderableWidget(cmdBox);
-        y += 28;
+
+        int y = cmdY + 28;
 
         // Icon picker
         addRenderableWidget(Button.builder(Component.literal("Choose Icon"), b -> {
@@ -139,16 +143,16 @@ public final class CommandActionEditScreen extends Screen {
                     java.util.List.of()
             );
 
-            boolean ok;
-            if (editing == null) ok = RadialMenu.addToCurrent(item);
-            else                 ok = RadialMenu.replaceInCurrent(editing.id(), item);
+            boolean ok = (editing == null)
+                    ? RadialMenu.addToCurrent(item)
+                    : RadialMenu.replaceInCurrent(editing.id(), item);
 
             if (!ok) {
                 Constants.LOG.info("[{}] Command save failed for '{}'.", Constants.MOD_NAME, draftTitle);
             }
 
             if (parent instanceof MenuEditorScreen m) {
-                m.refreshFromChild(); // rebuild when we return
+                m.refreshFromChild();
             }
             this.minecraft.setScreen(parent);
         } catch (Throwable t) {
@@ -164,20 +168,12 @@ public final class CommandActionEditScreen extends Screen {
 
         g.drawCenteredString(this.font, this.title.getString(), this.width / 2, 14, 0xFFFFFF);
 
-        // Labels positioned relative to the text boxes to keep spacing clean
+        // Labels drawn directly above their boxes
         int titleLabelX = this.width / 2 - 160;
         int cmdLabelX   = titleLabelX;
 
-        int titleLabelY = (titleBox != null ? titleBox.getY() : 48) - 14; // above title box
-        if (titleLabelY < 8) titleLabelY = 8;
-
-        int cmdLabelY = (cmdBox != null ? cmdBox.getY() : 76) - 14;        // above command box
-        // Extra breathing room vs. the title box bottom:
-        // ensure the command label is at least 6px below the bottom of the title box
-        if (titleBox != null) {
-            int minCmdLabelY = titleBox.getY() + titleBox.getHeight() + 6;
-            if (cmdLabelY < minCmdLabelY) cmdLabelY = minCmdLabelY;
-        }
+        int titleLabelY = (titleBox != null ? titleBox.getY() : 48) - 14;
+        int cmdLabelY   = (cmdBox   != null ? cmdBox.getY()   : 76) - 14;
 
         g.drawString(this.font, "Title:",   titleLabelX, titleLabelY, 0xA0A0A0);
         g.drawString(this.font, "Command:", cmdLabelX,   cmdLabelY,   0xA0A0A0);
