@@ -14,6 +14,7 @@ import org.z2six.ezactions.data.icon.IconSpec;
 import org.z2six.ezactions.data.menu.MenuItem;
 import org.z2six.ezactions.data.menu.RadialMenu;
 import org.z2six.ezactions.gui.IconRenderer;
+import org.z2six.ezactions.data.json.MenuImportExport;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -59,6 +60,8 @@ public final class MenuEditorScreen extends Screen {
     private Button btnEdit;
     private Button btnRemove;
     private Button btnClose;
+    private Button btnExport;
+    private Button btnImport;
 
     // List geometry
     private int listLeft, listTop, listWidth, listHeight;
@@ -302,12 +305,49 @@ public final class MenuEditorScreen extends Screen {
         addRenderableWidget(btnRemove);
         y += 24;
 
-        // Close
+        // --- Import / Export  ---
+        final int BTN_H = 20;
+        final int VSTEP = 24; // consistent spacing
+
+        // Labels with simple Unicode arrows; tinted so they stand out
+        Component importLabel = Component.literal("⇩ Import").withStyle(ChatFormatting.AQUA);
+        Component exportLabel = Component.literal("⇧ Export").withStyle(ChatFormatting.AQUA);
+
+        // Keep Close at bottom - 22 (your convention)
+        int yClose = bottom - 22;
+        int yExport = yClose - VSTEP;   // directly above Close
+        int yImport = yExport - VSTEP;  // above Export
+
+        btnImport = Button.builder(importLabel, b -> {
+            try {
+                int n = MenuImportExport.importFromClipboard();
+                if (n >= 0) {
+                    // Refresh UI list after replace
+                    rebuildRows();
+                    selectedRow = -1;
+                    scrollY = 0;
+                }
+            } catch (Throwable t) {
+                Constants.LOG.warn("[{}] Import button action failed: {}", Constants.MOD_NAME, t.toString());
+            }
+        }).bounds(x, yImport, LEFT_W, BTN_H).build();
+        addRenderableWidget(btnImport);
+
+        btnExport = Button.builder(exportLabel, b -> {
+            try {
+                MenuImportExport.exportToClipboard();
+            } catch (Throwable t) {
+                Constants.LOG.warn("[{}] Export button action failed: {}", Constants.MOD_NAME, t.toString());
+            }
+        }).bounds(x, yExport, LEFT_W, BTN_H).build();
+        addRenderableWidget(btnExport);
+
+        // Close (kept at bottom)
         btnClose = Button.builder(Component.literal("Close"), b -> onClose())
-                .bounds(x, bottom - 22, LEFT_W, 20).build();
+                .bounds(x, yClose, LEFT_W, BTN_H).build();
         addRenderableWidget(btnClose);
 
-        // List area on the right
+        // --- List area on the right (unchanged below) ---
         listLeft = left + LEFT_W + PAD;
         listTop = top;
         listWidth = right - listLeft;
@@ -446,38 +486,16 @@ public final class MenuEditorScreen extends Screen {
                 g.drawString(this.font, name, textX, y + (ROW_H - 9) / 2, 0xFFFFFF);
 
                 IClickAction act = mi.action();
-                String t = (act != null) ? act.getType().name() : "CATEGORY";
+                String t = (act != null) ? act.getType().name() : "BUNDLE";
                 int tw = this.font.width(t);
                 g.drawString(this.font, t, listLeft + listWidth - tw - 8, y + (ROW_H - 9) / 2, 0xA0A0A0);
-            }
-        }
-
-        // Drag ghost + insertion line
-        if (dragging && dragRowIdx >= 0 && dragRowIdx < rows.size()) {
-            int yGhost = mouseY - dragGhostOffsetY;
-            g.fill(listLeft, yGhost, listLeft + listWidth, yGhost + ROW_H, 0x40FFFFFF);
-
-            Row r = rows.get(dragRowIdx);
-            if (r instanceof Row.ItemRow ir) {
-                MenuItem mi = ir.item();
-                String name = mi.title() == null ? "(untitled)" : mi.title();
-                if (mi.isCategory()) name = "§c(RMB to open)§r " + name;
-                g.drawString(this.font, name, listLeft + 8, yGhost + (ROW_H - 9) / 2, 0xFFFFFF);
-            } else if (r instanceof Row.BackRow) {
-                g.drawString(this.font, ChatFormatting.RED + "Back", listLeft + 8, yGhost + (ROW_H - 9) / 2, 0xFF0000);
-            } else if (r instanceof Row.BreadcrumbRow br) {
-                g.drawString(this.font, br.path(), listLeft + 8, yGhost + (ROW_H - 9) / 2, 0xFFFFFFFF);
-            }
-
-            if (dropAt >= 0) {
-                int yLine = listTop + (dropAt * ROW_H) - (int)scrollY;
-                g.fill(listLeft, yLine - 1, listLeft + listWidth, yLine + 1, BLUE);
             }
         }
 
         // Scrollbar
         drawScrollbar(g);
 
+        // Draw widgets last (so they appear above panels)
         super.render(g, mouseX, mouseY, partialTick);
     }
 
