@@ -285,7 +285,7 @@ public final class MenuEditorScreen extends Screen {
         y += 24;
 
         // Add Category
-        btnAddCat = Button.builder(Component.literal("Add Category"), b -> {
+        btnAddCat = Button.builder(Component.literal("Add Bundle"), b -> {
             this.minecraft.setScreen(new CategoryEditScreen(this, null));
         }).bounds(x, y, LEFT_W, 20).build();
         addRenderableWidget(btnAddCat);
@@ -442,7 +442,7 @@ public final class MenuEditorScreen extends Screen {
                 }
 
                 String name = mi.title() == null ? "(untitled)" : mi.title();
-                if (mi.isCategory()) name = "(RMB to open) " + name;
+                if (mi.isCategory()) name = "§c(RMB to open)§r " + name;
                 g.drawString(this.font, name, textX, y + (ROW_H - 9) / 2, 0xFFFFFF);
 
                 IClickAction act = mi.action();
@@ -461,7 +461,7 @@ public final class MenuEditorScreen extends Screen {
             if (r instanceof Row.ItemRow ir) {
                 MenuItem mi = ir.item();
                 String name = mi.title() == null ? "(untitled)" : mi.title();
-                if (mi.isCategory()) name = "(RMB to open) " + name;
+                if (mi.isCategory()) name = "§c(RMB to open)§r " + name;
                 g.drawString(this.font, name, listLeft + 8, yGhost + (ROW_H - 9) / 2, 0xFFFFFF);
             } else if (r instanceof Row.BackRow) {
                 g.drawString(this.font, ChatFormatting.RED + "Back", listLeft + 8, yGhost + (ROW_H - 9) / 2, 0xFF0000);

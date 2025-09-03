@@ -11,6 +11,9 @@ import net.neoforged.neoforge.common.NeoForge;
 import org.z2six.ezactions.handler.KeyboardHandler;
 import org.z2six.ezactions.util.EZActionsKeybinds;
 
+// NEW: Configured-visible radial design spec + migration hook
+import org.z2six.ezactions.config.DesignClientConfig;
+
 /**
  * Main mod entry. We register MOD-bus and GAME-bus listeners programmatically.
  */
@@ -32,7 +35,17 @@ public final class ezactions {
                     org.z2six.ezactions.config.GeneralClientConfig.SPEC,
                     "ezactions/general-client.toml"
             );
-            Constants.LOG.debug("[{}] Registered CLIENT config specs (anim-client.toml, general-client.toml).", Constants.MOD_NAME);
+
+            // NEW: design-client.toml (replaces legacy radial.json; shows in Configured)
+            modContainer.registerConfig(
+                    ModConfig.Type.CLIENT,
+                    DesignClientConfig.SPEC,
+                    "ezactions/design-client.toml"
+            );
+            // Hook: migrate existing file-based TOML (or legacy radial.json) into the spec on first load
+            modBus.addListener(DesignClientConfig::onConfigLoad);
+
+            Constants.LOG.debug("[{}] Registered CLIENT config specs (anim-client.toml, general-client.toml, design-client.toml).", Constants.MOD_NAME);
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] Failed to register CLIENT configs: {}", Constants.MOD_NAME, t.toString());
         }

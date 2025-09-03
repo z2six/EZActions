@@ -34,7 +34,7 @@ public final class CategoryEditScreen extends Screen {
     private EditBox titleBox;
 
     public CategoryEditScreen(Screen parent, MenuItem editing) {
-        super(Component.literal(editing == null ? "Add Category" : "Edit Category"));
+        super(Component.literal(editing == null ? "Add Bundle" : "Edit Bundle"));
         this.parent = parent;
         this.editing = editing;
 
@@ -52,7 +52,7 @@ public final class CategoryEditScreen extends Screen {
         int y = 48;
 
         titleBox = new EditBox(this.font, cx - 140, y, 280, 20, Component.literal("Title"));
-        titleBox.setHint(Component.literal("Category title (e.g., Utilities)"));
+        titleBox.setHint(Component.literal("Bundle title (e.g., Utilities)"));
         titleBox.setValue(draftTitle);
         titleBox.setResponder(s -> draftTitle = safe(s));
         addRenderableWidget(titleBox);

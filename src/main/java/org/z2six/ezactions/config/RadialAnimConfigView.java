@@ -22,7 +22,7 @@ public final class RadialAnimConfigView {
     private RadialAnimConfigView() {
         boolean ae = true, aoc = true, ah = true;
         double  hgp = 0.05D;
-        int     ocm = 125;
+        int     ocm = 250;
 
         try {
             // Pull directly from the ModConfigSpec values.
