@@ -41,7 +41,7 @@ public final class MenuEditorScreen extends Screen {
     // Drag visuals
     private static final int BLUE = 0x802478FF;
     private static final int HILITE = 0x202478FF;
-    private static final int ROW_BG = 0x20101010;
+    private static final int ROW_BG = 0x20FFFFFF;
 
     // Scrollbar visuals
     private static final int SB_W = 6;        // scrollbar width
@@ -443,7 +443,8 @@ public final class MenuEditorScreen extends Screen {
         g.fill(listLeft, listTop, listLeft + listWidth, listTop + listHeight, 0xC0101010);
 
         // Title
-        g.drawCenteredString(this.font, this.title.getString(), this.width / 2, 6, 0xFFFFFF);
+        int panelCenterX = listLeft + (listWidth / 2);
+        g.drawCenteredString(this.font, this.title.getString(), panelCenterX, 6, 0xFFFFFF);
 
         // Render list
         int first = firstVisibleRow();
@@ -489,6 +490,45 @@ public final class MenuEditorScreen extends Screen {
                 String t = (act != null) ? act.getType().name() : "BUNDLE";
                 int tw = this.font.width(t);
                 g.drawString(this.font, t, listLeft + listWidth - tw - 8, y + (ROW_H - 9) / 2, 0xA0A0A0);
+            }
+        }
+
+        // Drag ghost + insertion line (restored)
+        if (dragging && dragRowIdx >= 0 && dragRowIdx < rows.size()) {
+            int yGhost = mouseY - dragGhostOffsetY;
+            // semi-transparent strip where the dragged row is following the mouse
+            g.fill(listLeft, yGhost, listLeft + listWidth, yGhost + ROW_H, 0x40FFFFFF);
+
+            Row r = rows.get(dragRowIdx);
+            if (r instanceof Row.ItemRow ir) {
+                MenuItem mi = ir.item();
+
+                int ghostTextX = listLeft + 8;
+
+                // draw icon if present, like normal rows
+                IconSpec icon = mi.icon();
+                if (icon != null) {
+                    try {
+                        IconRenderer.drawIcon(g, listLeft + 8 + ICON_SZ / 2, yGhost + ROW_H / 2, icon);
+                        ghostTextX += ICON_SZ + 6;
+                    } catch (Throwable ignored) {}
+                }
+
+                String name = mi.title() == null ? "(untitled)" : mi.title();
+                if (mi.isCategory()) name = "§c(RMB to open)§r " + name;
+                g.drawString(this.font, name, ghostTextX, yGhost + (ROW_H - 9) / 2, 0xFFFFFF);
+
+            } else if (r instanceof Row.BackRow) {
+                g.drawString(this.font, ChatFormatting.RED + "Back", listLeft + 8, yGhost + (ROW_H - 9) / 2, 0xFF0000);
+
+            } else if (r instanceof Row.BreadcrumbRow br) {
+                g.drawString(this.font, br.path(), listLeft + 8, yGhost + (ROW_H - 9) / 2, 0xFFFFFFFF);
+            }
+
+            // blue insertion line where the item would drop
+            if (dropAt >= 0) {
+                int yLine = listTop + (dropAt * ROW_H) - (int) scrollY;
+                g.fill(listLeft, yLine - 1, listLeft + listWidth, yLine + 1, BLUE);
             }
         }
 
