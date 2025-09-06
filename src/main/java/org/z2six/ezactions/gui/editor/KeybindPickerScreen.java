@@ -18,6 +18,11 @@ import java.util.function.Consumer;
  * Scrollable, category-grouped keybind list with readable labels.
  * Calls onPick.accept(km.getName()) -> e.g. "key.inventory"
  * Defensive logs; no crashes.
+ *
+ * Added:
+ * - Click-and-drag scrollbar knob.
+ * - Robust math for knob <-> scrollY mapping.
+ * - Debug logs for layout/drag diagnostics.
  */
 public final class KeybindPickerScreen extends Screen implements NoMenuBlurScreen {
 
@@ -30,6 +35,10 @@ public final class KeybindPickerScreen extends Screen implements NoMenuBlurScree
 
     private double scrollY = 0;
     private final List<Row> rows = new ArrayList<>();
+
+    // Drag state for scrollbar knob
+    private boolean draggingScrollbar = false;
+    private int dragGrabOffsetY = 0; // distance from knob top to cursor when drag starts
 
     private static final class Row {
         final boolean header;
@@ -74,12 +83,14 @@ public final class KeybindPickerScreen extends Screen implements NoMenuBlurScree
                 }
             }
             Constants.LOG.info("[{}] KeybindPicker: built {} rows ({} categories).", Constants.MOD_NAME, rows.size(), cats.size());
+            // Reset scroll if content shrank
+            scrollY = clamp(scrollY, 0, Math.max(0, rows.size() * ROW_H - viewHeight()));
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] KeybindPicker init failed: {}", Constants.MOD_NAME, t.toString());
         }
     }
 
-    // NOTE: signatures differ a bit across versions; avoid @Override to keep it robust
+    // --- Scroll wheel (two signatures for cross-version safety) -------------
     public boolean mouseScrolled(double mx, double my, double delta) {
         double content = rows.size() * ROW_H;
         double view = viewHeight();
@@ -90,9 +101,27 @@ public final class KeybindPickerScreen extends Screen implements NoMenuBlurScree
     }
 
     @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
+        double content = rows.size() * ROW_H;
+        double view = viewHeight();
+        if (content > view) {
+            scrollY = clamp(scrollY - deltaY * 32.0, 0, Math.max(0, content - view));
+        }
+        return true;
+    }
+
+    // --- Click handling ------------------------------------------------------
+
+    @Override
     public boolean mouseClicked(double mx, double my, int button) {
         if (button != 0) return false;
 
+        // 1) Try scrollbar knob first so it "wins" over list clicks.
+        if (beginScrollbarDragIfHit(mx, my)) {
+            return true;
+        }
+
+        // 2) Fall back to list button clicks
         int x = PADDING;
         int y = (int) (PADDING - scrollY);
         int usableW = width - PADDING * 2;
@@ -119,6 +148,31 @@ public final class KeybindPickerScreen extends Screen implements NoMenuBlurScree
         }
         return super.mouseClicked(mx, my, button);
     }
+
+    @Override
+    public boolean mouseReleased(double mx, double my, int button) {
+        if (button == 0 && draggingScrollbar) {
+            draggingScrollbar = false;
+            Constants.LOG.debug("[{}] KeybindPicker: scrollbar drag end (scrollY={})", Constants.MOD_NAME, scrollY);
+            return true;
+        }
+        return super.mouseReleased(mx, my, button);
+    }
+
+    @Override
+    public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
+        if (draggingScrollbar && button == 0) {
+            try {
+                applyDragToScroll(my);
+            } catch (Throwable t) {
+                Constants.LOG.warn("[{}] KeybindPicker drag update failed: {}", Constants.MOD_NAME, t.toString());
+            }
+            return true;
+        }
+        return super.mouseDragged(mx, my, button, dx, dy);
+    }
+
+    // --- Render --------------------------------------------------------------
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
@@ -154,6 +208,8 @@ public final class KeybindPickerScreen extends Screen implements NoMenuBlurScree
         super.render(g, mouseX, mouseY, partialTick);
     }
 
+    // --- Scrollbar math / drawing -------------------------------------------
+
     private int viewHeight() {
         return height - PADDING * 2;
     }
@@ -167,28 +223,75 @@ public final class KeybindPickerScreen extends Screen implements NoMenuBlurScree
         int view = viewHeight();
         if (content <= view) return;
 
-        int barX = width - PADDING - 6;
-        int barY = PADDING;
-        int barH = view;
-        g.fill(barX, barY, barX + 6, barY + barH, 0x40000000);
+        ScrollbarMetrics m = computeScrollbarMetrics(content, view);
+        // Track
+        g.fill(m.barX, m.barY, m.barX + m.barW, m.barY + m.barH, 0x40000000);
+        // Knob
+        g.fill(m.barX + 1, m.knobY, m.barX + m.barW - 1, m.knobY + m.knobH, 0x80FFFFFF);
+    }
+
+    private static final class ScrollbarMetrics {
+        int barX, barY, barW, barH;
+        int knobY, knobH;
+    }
+
+    /** Compute positions/sizes for track & knob given current scrollY. */
+    private ScrollbarMetrics computeScrollbarMetrics(double content, int view) {
+        ScrollbarMetrics m = new ScrollbarMetrics();
+        m.barW = 6;
+        m.barX = width - PADDING - m.barW;
+        m.barY = PADDING;
+        m.barH = view;
 
         double ratio = view / content;
-        int knobH = Math.max(20, (int) (barH * ratio));
-        int knobY = (int) (barY + (barH - knobH) * (scrollY / (content - view)));
+        m.knobH = Math.max(20, (int) (m.barH * ratio));
 
-        g.fill(barX + 1, knobY, barX + 5, knobY + knobH, 0x80FFFFFF);
+        // Place knob according to current scrollY
+        double denom = Math.max(1.0, content - view);
+        m.knobY = (int) (m.barY + (m.barH - m.knobH) * (scrollY / denom));
+        return m;
     }
 
-    @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
+    /** If clicked within knob, start dragging; returns true if drag began. */
+    private boolean beginScrollbarDragIfHit(double mx, double my) {
         double content = rows.size() * ROW_H;
-        double view = viewHeight();
-        if (content > view) {
-            scrollY = clamp(scrollY - deltaY * 32.0, 0, Math.max(0, content - view));
+        int view = viewHeight();
+        if (content <= view) return false;
+
+        ScrollbarMetrics m = computeScrollbarMetrics(content, view);
+        boolean inKnob = mx >= m.barX + 1 && mx <= m.barX + m.barW - 1 && my >= m.knobY && my <= m.knobY + m.knobH;
+        if (inKnob) {
+            draggingScrollbar = true;
+            dragGrabOffsetY = (int) (my - m.knobY);
+            Constants.LOG.debug("[{}] KeybindPicker: scrollbar drag start (grabOffsetY={}, scrollY={})",
+                    Constants.MOD_NAME, dragGrabOffsetY, scrollY);
+            return true;
         }
-        return true;
+        // Optional: jump-to-click outside knob (page up/down). We skip to keep behavior simple.
+        return false;
     }
 
+    /** While dragging, convert mouseY back to scrollY using inverse mapping. */
+    private void applyDragToScroll(double mouseY) {
+        double content = rows.size() * ROW_H;
+        int view = viewHeight();
+        if (content <= view) return;
+
+        ScrollbarMetrics m = computeScrollbarMetrics(content, view);
+
+        // Desired knob top from drag, clamped to track
+        int minY = m.barY;
+        int maxY = m.barY + m.barH - m.knobH;
+        int newKnobY = (int) clamp(mouseY - dragGrabOffsetY, minY, maxY);
+
+        // Inverse mapping: knob pos -> scrollY
+        double trackRange = (double) (m.barH - m.knobH);
+        double t = trackRange <= 0 ? 0.0 : (newKnobY - m.barY) / trackRange;
+        double maxScroll = Math.max(0, content - view);
+        scrollY = clamp(t * maxScroll, 0, maxScroll);
+    }
+
+    // ------------------------------------------------------------------------
 
     @Override
     public void onClose() {
