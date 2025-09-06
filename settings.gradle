@@ -1,3 +1,4 @@
+// MainFile: settings.gradle
 pluginManagement {
     repositories {
         mavenLocal()
@@ -8,4 +9,13 @@ pluginManagement {
 
 plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
+}
+
+// --- Multi-module wiring ---
+rootProject.name = 'ezactions'   // safe to rename if you like
+include('common', 'neo-1.21.1')
+
+// Debug log: show what we just included (helps sanity-check in IDEA’s Gradle pane)
+gradle.settingsEvaluated {
+    logger.lifecycle("[settings] Included subprojects: " + rootProject.children*.name)
 }

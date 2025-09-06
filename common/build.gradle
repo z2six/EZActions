@@ -1,0 +1,58 @@
+// MainFile: common/build.gradle  — CHANGED
+// Compile your shared sources against the same NeoForge/Minecraft userdev so
+// imports like net.minecraft.*, net.neoforged.*, Gson, NightConfig, etc. resolve.
+
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.107'
+}
+
+ext {
+    mc_version                  = (findProperty('minecraft_version') ?: '1.21.1')
+    neo_version                 = (findProperty('neo_version')       ?: '21.1.206')
+    parchment_minecraft_version = (findProperty('parchment_minecraft_version') ?: mc_version)
+    parchment_mappings_version  = (findProperty('parchment_mappings_version') ?: '2024.11.17')
+
+    // purely metadata if you ever expand templates from here (we don’t, neo-* does)
+    minecraft_version_range     = (findProperty('minecraft_version_range') ?: '[1.21.1,1.22)')
+    neo_version_range           = (findProperty('neo_version_range')       ?: '[21,)')
+    loader_version_range        = (findProperty('loader_version_range')    ?: '[4,)')
+
+    mod_id_prop          = (findProperty('mod_id') ?: 'ezactions')
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+}
+
+neoForge {
+    version = neo_version
+    parchment {
+        minecraftVersion = parchment_minecraft_version
+        mappingsVersion  = parchment_mappings_version
+    }
+
+    // No runs here; :neo-1.21.1 owns those. Keeping this lean.
+    mods {
+        // Binding is optional in multi-mod builds, but harmless and keeps IDE happy.
+        "${mod_id_prop}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+dependencies {
+    // Nothing special; ModDevGradle wires the MC/NeoForge classpath for us.
+    // If you need javax annotations (some of your code does), add a tiny compileOnly:
+    compileOnly 'javax.annotation:javax.annotation-api:1.3.2'
+    // (If your imports are org.jetbrains.annotations.Nullable instead, you can switch to that and drop this.)
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// Debug log so you see :common is set up
+gradle.projectsEvaluated {
+    logger.lifecycle("[common] Compiling against MC=${mc_version}, NeoForge=${neo_version}")
+}

@@ -1,0 +1,143 @@
+// MainFile: neo-1.21.1/build.gradle
+// Debug-safe, error-resilient subproject for MC 1.21.1 using NeoForge ModDevGradle.
+// Packs :common classes/resources into this jar, expands metadata from common templates,
+// and uses rootProject-relative paths to avoid Gradle scoping ambiguities.
+
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.107'
+}
+
+// Ensure :common is evaluated before we reference its outputs in the jar task
+evaluationDependsOn(':common')
+
+ext {
+    // Pull from gradle.properties so we don’t duplicate values
+    mc_version                  = (findProperty('minecraft_version') ?: '1.21.1')
+    neo_version                 = (findProperty('neo_version')       ?: '21.1.206')
+    parchment_minecraft_version = (findProperty('parchment_minecraft_version') ?: mc_version)
+    parchment_mappings_version  = (findProperty('parchment_mappings_version') ?: '2024.11.17')
+
+    minecraft_version_range     = (findProperty('minecraft_version_range') ?: '[1.21.1,1.22)')
+    neo_version_range           = (findProperty('neo_version_range')       ?: '[21,)')
+    loader_version_range        = (findProperty('loader_version_range')    ?: '[4,)')
+
+    mod_id_prop           = (findProperty('mod_id')        ?: 'ezactions')
+    mod_name_prop         = (findProperty('mod_name')      ?: 'EZActions')
+    mod_license_prop      = (findProperty('mod_license')   ?: 'MIT')
+    mod_version_prop      = (findProperty('mod_version')   ?: '0.0.0')
+    mod_authors_prop      = (findProperty('mod_authors')   ?: '')
+    mod_description_prop  = (findProperty('mod_description') ?: '')
+}
+
+dependencies {
+    // Pull all your real code/resources from :common
+    implementation project(':common')
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+}
+
+neoForge {
+    version = neo_version
+
+    parchment {
+        minecraftVersion = parchment_minecraft_version
+        mappingsVersion  = parchment_mappings_version
+    }
+
+    runs {
+        client {
+            client()
+            systemProperty 'neoforge.enabledGameTestNamespaces', mod_id_prop
+        }
+        server {
+            server()
+            programArgument '--nogui'
+            systemProperty 'neoforge.enabledGameTestNamespaces', mod_id_prop
+        }
+        gameTestServer {
+            type = "gameTestServer"
+            systemProperty 'neoforge.enabledGameTestNamespaces', mod_id_prop
+        }
+        data {
+            data()
+            // Generate into THIS subproject
+            programArguments.addAll '--mod', mod_id_prop,
+                    '--all',
+                    '--output', file('src/generated/resources/').absolutePath,
+                    // Re-use assets from :common as "existing" (resolve via rootProject to avoid scoping issues)
+                    '--existing', rootProject.file('common/src/main/resources').absolutePath
+        }
+        configureEach {
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            logLevel = org.slf4j.event.Level.DEBUG
+        }
+    }
+
+    mods {
+        "${mod_id_prop}" {
+            // Bind this subproject’s main sourceset as the mod.
+            // (Compiled code primarily comes from :common via dependency and jar packaging below.)
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+// Ensure this target sees its generated resources
+sourceSets.main.resources.srcDir 'src/generated/resources'
+
+// === Expand your template (moved to common/src/main/templates) ===
+// Use rootProject-relative paths to avoid the project(...) scoping ambiguity that caused your error.
+def templateDir  = rootProject.file('common/src/main/templates')
+def generatedDir = file('build/generated/sources/modMetadata')
+
+tasks.register('generateModMetadata', ProcessResources) {
+    doFirst {
+        if (!templateDir.exists()) {
+            logger.warn("[neo-1.21.1] No templates at ${templateDir}; skipping expansion to avoid failing the build.")
+        } else {
+            logger.lifecycle("[neo-1.21.1] Expanding templates ${templateDir} → ${generatedDir}")
+        }
+    }
+    onlyIf { templateDir.exists() }
+    def replace = [
+            minecraft_version       : mc_version,
+            minecraft_version_range : minecraft_version_range,
+            neo_version             : neo_version,
+            neo_version_range       : neo_version_range,
+            loader_version_range    : loader_version_range,
+            mod_id                  : mod_id_prop,
+            mod_name                : mod_name_prop,
+            mod_license             : mod_license_prop,
+            mod_version             : mod_version_prop,
+            mod_authors             : mod_authors_prop,
+            mod_description         : mod_description_prop
+    ]
+    inputs.properties replace
+    expand replace
+    from(templateDir)
+    into(generatedDir)
+}
+sourceSets.main.resources.srcDir(tasks.named('generateModMetadata'))
+neoForge.ideSyncTask(tasks.named('generateModMetadata'))
+
+// Package :common’s compiled outputs into THIS jar so it’s self-contained.
+// (We also log clearly so you can see it happening.)
+tasks.named('jar', Jar) {
+    // Access :common’s compiled outputs safely now that we evaluationDependsOn(':common')
+    from(project(':common').sourceSets.main.output)
+    doFirst {
+        logger.lifecycle("[neo-1.21.1] Packaging :common outputs into ${archiveFileName.get()}")
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// Friendly summary log
+gradle.projectsEvaluated {
+    logger.lifecycle("[neo-1.21.1] Configured MC=${mc_version}, NeoForge=${neo_version}, Parchment=${parchment_mappings_version}")
+}
