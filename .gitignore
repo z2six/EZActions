@@ -117,3 +117,22 @@ runs/
 
 # Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)
 !gradle-wrapper.jar
+
+# Gradle & build outputs (any module)
+**/.gradle/
+**/build/
+**/out/
+
+# NeoForge/MDG run dirs (any module)
+**/run/
+**/runs/
+
+# Generated resources from data gen, etc.
+**/src/generated/
+
+# --- Keep only the build.gradle in each MC target module ---
+neo-1.21.*/**        # ignore everything under neo-1.21.x/...
+!neo-1.21.*/build.gradle
+# (Optional: if you ever add these per-module, unignore too)
+#!neo-1.21.*/gradle.properties
+#!neo-1.21.*/README.md

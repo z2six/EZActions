@@ -1,0 +1,11 @@
+// MainFile: neo-1.21.5/build.gradle
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.107'
+}
+ext {
+    target_mc  = '1.21.5'
+    target_neo = (findProperty('neo_version_1_21_5') ?: '')
+    target_parchment_tag = (findProperty('parchment_mappings_version_1_21_5') ?: findProperty('parchment_mappings_version'))
+}
+apply from: rootProject.file('gradle/neo-subproject.gradle')

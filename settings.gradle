@@ -6,16 +6,26 @@ pluginManagement {
         maven { url = 'https://maven.neoforged.net/releases' }
     }
 }
-
 plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
 }
 
-// --- Multi-module wiring ---
-rootProject.name = 'ezactions'   // safe to rename if you like
-include('common', 'neo-1.21.1')
+rootProject.name = 'ezactions'
 
-// Debug log: show what we just included (helps sanity-check in IDEA’s Gradle pane)
+// Include shared code + ALL 1.21.x targets you want to try
+include(
+        'common',
+        'neo-1.21.1',
+        'neo-1.21.2',
+        'neo-1.21.3',
+        'neo-1.21.4',
+        'neo-1.21.5',
+        'neo-1.21.6',
+        'neo-1.21.7',
+        'neo-1.21.8'
+)
+
+// Debug log
 gradle.settingsEvaluated {
     logger.lifecycle("[settings] Included subprojects: " + rootProject.children*.name)
 }

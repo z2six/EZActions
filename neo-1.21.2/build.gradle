@@ -1,0 +1,17 @@
+// MainFile: neo-1.21.2/build.gradle
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.107'
+}
+
+// Target this MC patch and **disable Parchment** (no release exists for 1.21.2)
+ext {
+    target_mc            = '1.21.2'
+    target_parchment_tag = '' // ← disables Parchment so we fall back to Mojang mappings
+    // Set the NeoForge version via gradle.properties if possible:
+    //   neo_version_1_21_2=21.2.xxx
+    // (Or hardcode it here by uncommenting the next line.)
+    // target_neo = '21.2.xxx'
+}
+
+apply from: rootProject.file('gradle/neo-subproject.gradle')

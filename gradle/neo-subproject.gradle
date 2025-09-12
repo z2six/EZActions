@@ -1,0 +1,202 @@
+// MainFile: gradle/neo-subproject.gradle
+// Shared config for all MC 1.21.x NeoForge targets (applied by each neo-1.21.x module).
+// Configuration-cache safe.
+
+evaluationDependsOn(':common')
+
+// ---------- Resolve target MC & helper key formats ----------
+def TARGET_MC = (project.findProperty('target_mc') as String)
+        ?: (project.findProperty('minecraft_version') as String)
+        ?: '1.21.1'
+def MC_UNDERSCORE = TARGET_MC.replace('.', '_')
+
+// ---------- Resolve NeoForge coordinate (mandatory) ----------
+def neoPerMcKey = "neo_version_${MC_UNDERSCORE}"
+def TARGET_NEO = (project.findProperty('target_neo') as String)
+        ?: (project.findProperty(neoPerMcKey) as String)
+        ?: (project.findProperty('neo_version') as String)
+        ?: ''
+if (!TARGET_NEO?.trim()) {
+    throw new GradleException(
+            "[${project.name}] Missing NeoForge version for MC ${TARGET_MC}. " +
+                    "Set target_neo in this module or ${neoPerMcKey} in gradle.properties (or a global neo_version)."
+    )
+}
+
+// ---------- Resolve Parchment (supports underscore AND dot keys) ----------
+def parchTagKeyUS = "parchment_mappings_version_${MC_UNDERSCORE}"
+def parchTagKeyDS = "parchment_mappings_version_${TARGET_MC}"
+def parchMcKeyUS  = "parchment_minecraft_version_${MC_UNDERSCORE}"
+def parchMcKeyDS  = "parchment_minecraft_version_${TARGET_MC}"
+
+// Detect explicit disable via presence of target_parchment_tag=''
+def RAW_PARCH_TAG_PROP_PRESENT = project.hasProperty('target_parchment_tag')
+def RAW_PARCH_TAG_VALUE        = RAW_PARCH_TAG_PROP_PRESENT ? (project.findProperty('target_parchment_tag') as String) : null
+def EXPLICITLY_DISABLE_PARCH   = RAW_PARCH_TAG_PROP_PRESENT && (RAW_PARCH_TAG_VALUE == null || RAW_PARCH_TAG_VALUE.trim().isEmpty())
+
+// Resolve tag & MC with precedence: explicit -> per-MC (underscore) -> per-MC (dot) -> global -> default
+def RES_PARCH_TAG = EXPLICITLY_DISABLE_PARCH ? '' :
+        ((project.findProperty('target_parchment_tag') as String)
+                ?: (project.findProperty(parchTagKeyUS) as String)
+                ?: (project.findProperty(parchTagKeyDS) as String)
+                ?: (project.findProperty('parchment_mappings_version') as String)
+                ?: '2024.11.17')
+
+def RES_PARCH_MC = EXPLICITLY_DISABLE_PARCH ? '' :
+        ((project.findProperty('target_parchment_mc') as String)
+                ?: (project.findProperty(parchMcKeyUS) as String)
+                ?: (project.findProperty(parchMcKeyDS) as String)
+                ?: (project.findProperty('parchment_minecraft_version') as String)
+                ?: TARGET_MC)
+
+// Also allow global kill-switch: use_parchment=false
+def GLOBAL_USE_PARCH = (project.findProperty('use_parchment') as String)
+def USE_PARCH_FALSE  = (GLOBAL_USE_PARCH != null && GLOBAL_USE_PARCH.toLowerCase() == 'false')
+
+// Final on/off
+def DISABLE_PARCH = EXPLICITLY_DISABLE_PARCH || USE_PARCH_FALSE || !RES_PARCH_TAG?.trim()
+
+// ---------- Metadata ranges ----------
+def META_MC_RANGE   = (project.findProperty('minecraft_version_range_1_21') as String) ?: '[1.21,1.22)'
+def META_NEO_RANGE  = (project.findProperty('neo_version_range_1_21') as String)       ?: '[21,22)'
+def META_LOAD_RANGE = (project.findProperty('loader_version_range') as String)         ?: '[4,)'
+
+// ---------- Mod metadata ----------
+def MOD_ID          = (project.findProperty('mod_id') as String)          ?: 'ezactions'
+def MOD_NAME        = (project.findProperty('mod_name') as String)        ?: 'EZActions'
+def MOD_LICENSE     = (project.findProperty('mod_license') as String)     ?: 'MIT'
+def MOD_VERSION     = (project.findProperty('mod_version') as String)     ?: '0.0.0'
+def MOD_AUTHORS     = (project.findProperty('mod_authors') as String)     ?: ''
+def MOD_DESCRIPTION = (project.findProperty('mod_description') as String) ?: ''
+
+// ---------- Debug summary ----------
+final String PNAME = project.name
+logger.lifecycle("[${PNAME}] MC=${TARGET_MC}, NeoForge=${TARGET_NEO}")
+if (DISABLE_PARCH) {
+    logger.lifecycle("[${PNAME}] Parchment: DISABLED (explicit or no tag). Using Mojang mappings.")
+} else {
+    def tagSource = RAW_PARCH_TAG_PROP_PRESENT ? 'target_parchment_tag' :
+            (project.hasProperty(parchTagKeyUS) ? parchTagKeyUS :
+                    project.hasProperty(parchTagKeyDS) ? parchTagKeyDS :
+                            'parchment_mappings_version (global/default)')
+    def mcSource = (project.hasProperty('target_parchment_mc') ? 'target_parchment_mc' :
+            (project.hasProperty(parchMcKeyUS) ? parchMcKeyUS :
+                    project.hasProperty(parchMcKeyDS) ? parchMcKeyDS :
+                            'parchment_minecraft_version (global/default)'))
+    logger.lifecycle("[${PNAME}] Parchment: ENABLED (mc=${RES_PARCH_MC} from ${mcSource}, tag=${RES_PARCH_TAG} from ${tagSource})")
+}
+logger.lifecycle("[${PNAME}] SUMMARY → MC=${TARGET_MC}, NeoForge=${TARGET_NEO}, " +
+        "Parchment=${DISABLE_PARCH ? 'DISABLED' : "mc=${RES_PARCH_MC},tag=${RES_PARCH_TAG}"}")
+
+// ---------- Dependencies ----------
+dependencies { implementation project(':common') }
+
+// ---------- ModDevGradle ----------
+neoForge {
+    version = TARGET_NEO
+
+    if (!DISABLE_PARCH) {
+        parchment {
+            minecraftVersion = RES_PARCH_MC
+            mappingsVersion  = RES_PARCH_TAG
+        }
+    }
+
+    runs {
+        client {
+            client()
+            systemProperty 'neoforge.enabledGameTestNamespaces', MOD_ID
+        }
+        server {
+            server()
+            programArgument '--nogui'
+            systemProperty 'neoforge.enabledGameTestNamespaces', MOD_ID
+        }
+        gameTestServer {
+            type = "gameTestServer"
+            systemProperty 'neoforge.enabledGameTestNamespaces', MOD_ID
+        }
+        data {
+            data()
+            programArguments.addAll '--mod', MOD_ID,
+                    '--all',
+                    '--output', file('src/generated/resources/').absolutePath,
+                    '--existing', rootProject.file('common/src/main/resources').absolutePath
+        }
+        configureEach {
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            logLevel = org.slf4j.event.Level.DEBUG
+        }
+    }
+
+    mods { "${MOD_ID}" { sourceSet(sourceSets.main) } }
+}
+
+// ---------- Resources & metadata expansion ----------
+def templateDir  = rootProject.layout.projectDirectory.dir('common/src/main/templates') // Directory
+def generatedDir = layout.buildDirectory.dir('generated/sources/modMetadata')           // Provider<Directory>
+
+tasks.register('generateModMetadata', ProcessResources) {
+    // Safe provider usage during configuration:
+    from(templateDir.asFile)                              // ok if missing: copies nothing
+    into(generatedDir.map { it.asFile })                  // pass Provider<File>
+
+    // Inputs for up-to-date checks
+    inputs.dir(templateDir)
+
+    // Expansion map (pure values)
+    def replace = [
+            minecraft_version       : TARGET_MC,
+            minecraft_version_range : META_MC_RANGE,
+            neo_version             : TARGET_NEO,
+            neo_version_range       : META_NEO_RANGE,
+            loader_version_range    : META_LOAD_RANGE,
+            mod_id                  : MOD_ID,
+            mod_name                : MOD_NAME,
+            mod_license             : MOD_LICENSE,
+            mod_version             : MOD_VERSION,
+            mod_authors             : MOD_AUTHORS,
+            mod_description         : MOD_DESCRIPTION
+    ]
+    inputs.properties(replace)
+    expand(replace)
+
+    // Execution-time log (safe to call .get() here)
+    doFirst {
+        def t = templateDir.asFile
+        def g = generatedDir.get().asFile
+        if (!t.exists()) {
+            logger.warn("[${PNAME}] No templates at ${t}; skipping metadata expansion (nothing to copy).")
+        } else {
+            logger.lifecycle("[${PNAME}] Expanding templates ${t} → ${g}")
+        }
+    }
+}
+
+// Include generated metadata in resources and wire task order
+sourceSets.main.resources.srcDir(generatedDir.map { it.asFile })
+tasks.named('processResources') {
+    dependsOn(tasks.named('generateModMetadata'))
+}
+neoForge.ideSyncTask(tasks.named('generateModMetadata'))
+
+// ---------- Naming: ezactions-<modVersion>-<mcVersion>.jar ----------
+version = "${MOD_VERSION}-${TARGET_MC}" // becomes the archiveVersion
+
+tasks.withType(org.gradle.api.tasks.bundling.AbstractArchiveTask).configureEach {
+    archiveBaseName.set(MOD_ID)                 // ezactions
+    archiveVersion.set(project.version as String) // e.g. 1.1.4-1.21.1
+    // no classifier -> plain .jar
+}
+
+// ---------- Package :common outputs into this jar ----------
+def commonOutput = project(':common').sourceSets.main.output
+tasks.named('jar', Jar) {
+    from(commonOutput)
+    doFirst { logger.lifecycle("[${PNAME}] Packaging :common outputs into ${archiveFileName.get()}") }
+}
+
+// ---------- Java compiler defaults ----------
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
