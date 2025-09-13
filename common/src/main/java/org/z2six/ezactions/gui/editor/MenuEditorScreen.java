@@ -27,8 +27,10 @@ import java.util.Objects;
  * - Right: list of items. Categories show as "(RMB to open) Name". RMB enters category; LMB selects/drag.
  * - When inside a category, a white breadcrumb row appears above a red "Back" row; clicking Back goes to parent.
  * - Drag & drop to reorder, with a blue insertion indicator line.
+ * - NEW: While dragging an item over a category, that category gets a BLUE outline; releasing drops the item INTO that category.
  * - Scrollbar & mouse wheel supported (like pickers).
  * - All mutations are persisted via RadialMenu helpers.
+ * - Defensive logging; fail-soft behavior (log & skip on errors).
  */
 public final class MenuEditorScreen extends Screen {
 
@@ -40,6 +42,7 @@ public final class MenuEditorScreen extends Screen {
 
     // Drag visuals
     private static final int BLUE = 0x802478FF;
+    private static final int BLUE_FULL = 0xFF2478FF; // for outlines (opaque stroke)
     private static final int HILITE = 0x202478FF;
     private static final int ROW_BG = 0x20FFFFFF;
 
@@ -74,9 +77,13 @@ public final class MenuEditorScreen extends Screen {
     // Scroll & drag
     private double scrollY = 0.0;
     private boolean dragging = false;
-    private int dragRowIdx = -1;    // index in rows[]
+    private int dragRowIdx = -1;             // index in rows[]
     private int dragGhostOffsetY = 0;
-    private int dropAt = -1;        // insertion position (between rows)
+    private int dropAt = -1;                  // insertion position (between rows) for reorder
+
+    // NEW: drop-into-category targeting while dragging
+    private MenuItem dropTargetCategory = null;  // currently highlighted category (valid target) or null
+    private int dropTargetRowIdx = -1;           // row index for outline rendering
 
     // Scrollbar drag
     private boolean sbDragging = false;
@@ -149,6 +156,10 @@ public final class MenuEditorScreen extends Screen {
         if (selectedRow >= rows.size()) selectedRow = rows.size() - 1;
         if (selectedRow < -1) selectedRow = -1;
         clampScroll();
+
+        // Reset transient hover-targets when list rebuilds
+        dropTargetCategory = null;
+        dropTargetRowIdx = -1;
     }
 
     private int contentCount() {
@@ -360,6 +371,10 @@ public final class MenuEditorScreen extends Screen {
         dropAt = -1;
         sbDragging = false;
 
+        // Reset new drop-target state
+        dropTargetCategory = null;
+        dropTargetRowIdx = -1;
+
         rebuildRows();
     }
 
@@ -493,7 +508,7 @@ public final class MenuEditorScreen extends Screen {
             }
         }
 
-        // Drag ghost + insertion line (restored)
+        // Drag ghost + insertion line / category outline
         if (dragging && dragRowIdx >= 0 && dragRowIdx < rows.size()) {
             int yGhost = mouseY - dragGhostOffsetY;
             // semi-transparent strip where the dragged row is following the mouse
@@ -525,8 +540,11 @@ public final class MenuEditorScreen extends Screen {
                 g.drawString(this.font, br.path(), listLeft + 8, yGhost + (ROW_H - 9) / 2, 0xFFFFFFFF);
             }
 
-            // blue insertion line where the item would drop
-            if (dropAt >= 0) {
+            // If we have a valid category drop target, outline it; otherwise show insertion line
+            if (dropTargetCategory != null && dropTargetRowIdx >= 0) {
+                int y = listTop + (dropTargetRowIdx * ROW_H) - (int)scrollY;
+                drawBlueOutline(g, listLeft, y, listLeft + listWidth, y + ROW_H);
+            } else if (dropAt >= 0) {
                 int yLine = listTop + (dropAt * ROW_H) - (int) scrollY;
                 g.fill(listLeft, yLine - 1, listLeft + listWidth, yLine + 1, BLUE);
             }
@@ -537,6 +555,19 @@ public final class MenuEditorScreen extends Screen {
 
         // Draw widgets last (so they appear above panels)
         super.render(g, mouseX, mouseY, partialTick);
+    }
+
+    /** Simple 2px blue border for the target row. */
+    private void drawBlueOutline(GuiGraphics g, int x1, int y1, int x2, int y2) {
+        final int s = 2;
+        // top
+        g.fill(x1, y1, x2, y1 + s, BLUE_FULL);
+        // bottom
+        g.fill(x1, y2 - s, x2, y2, BLUE_FULL);
+        // left
+        g.fill(x1, y1, x1 + s, y2, BLUE_FULL);
+        // right
+        g.fill(x2 - s, y1, x2, y2, BLUE_FULL);
     }
 
     private void drawScrollbar(GuiGraphics g) {
@@ -585,7 +616,7 @@ public final class MenuEditorScreen extends Screen {
             if (idx >= 0 && idx < rowCount()) {
                 Row r = rows.get(idx);
 
-                // NEW: ignore clicks on breadcrumb (non-interactive)
+                // Ignore clicks on breadcrumb (non-interactive)
                 if (r instanceof Row.BreadcrumbRow) {
                     return true;
                 }
@@ -625,6 +656,12 @@ public final class MenuEditorScreen extends Screen {
                         dragRowIdx = idx;
                         dragGhostOffsetY = (int)mouseY - (listTop + (idx * ROW_H) - (int)scrollY);
                         dropAt = computeDropAt(mouseY);
+                        dropTargetCategory = null;
+                        dropTargetRowIdx = -1;
+                        try {
+                            int fromContent = rowToContentIndex(dragRowIdx);
+                            Constants.LOG.debug("[{}] Drag start row={} contentIndex={}", Constants.MOD_NAME, dragRowIdx, fromContent);
+                        } catch (Throwable ignored) {}
                         return true;
                     }
                 }
@@ -650,6 +687,38 @@ public final class MenuEditorScreen extends Screen {
         return Math.max(header, pos);
     }
 
+    /** Determine if the mouse is over a valid category to drop into. */
+    private void updateDropTargetCategory(double mouseY) {
+        dropTargetCategory = null;
+        dropTargetRowIdx = -1;
+
+        int idx = mouseToRow(mouseY);
+        if (idx < 0 || idx >= rows.size()) return;
+
+        Row r = rows.get(idx);
+        if (!(r instanceof Row.ItemRow ir)) return;
+
+        MenuItem target = ir.item();
+        if (!target.isCategory()) return;
+
+        // Can't drop onto itself
+        if (dragRowIdx >= 0 && dragRowIdx < rows.size()) {
+            Row dr = rows.get(dragRowIdx);
+            if (dr instanceof Row.ItemRow dir) {
+                MenuItem dragged = dir.item();
+                if (Objects.equals(dragged.id(), target.id())) {
+                    return;
+                }
+            }
+        }
+
+        // From this screen view, cycles cannot happen (descendants aren't visible here).
+        // Still, we keep it conservative and allow only siblings-at-this-level drops.
+
+        dropTargetCategory = target;
+        dropTargetRowIdx = idx;
+    }
+
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (sbDragging && button == 0) {
@@ -657,7 +726,16 @@ public final class MenuEditorScreen extends Screen {
             return true;
         }
         if (dragging && button == 0) {
-            dropAt = computeDropAt(mouseY);
+            // First, see if we hover a category; if so, use "drop into" mode
+            updateDropTargetCategory(mouseY);
+
+            if (dropTargetCategory != null) {
+                // When targeting a category, suppress the reorder insertion line
+                dropAt = -1;
+            } else {
+                // No category target: fall back to normal reordering insertion line
+                dropAt = computeDropAt(mouseY);
+            }
             return true;
         }
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
@@ -673,9 +751,65 @@ public final class MenuEditorScreen extends Screen {
             int fromRow = dragRowIdx;
             int toRow = dropAt;
 
+            // snapshot & reset drag flags early to avoid reentrancy issues
             dragging = false;
             dragRowIdx = -1;
 
+            // If we had a category target, drop INTO it
+            if (dropTargetCategory != null) {
+                try {
+                    // Identify the dragged item and remove it from the current list
+                    int fromContent = rowToContentIndex(fromRow);
+                    if (fromContent >= 0) {
+                        List<MenuItem> cur = current();
+                        if (fromContent < cur.size()) {
+                            MenuItem moved = cur.get(fromContent);
+
+                            // Guard: avoid dropping a category into itself (already checked) or nulls
+                            if (moved != null && !Objects.equals(moved.id(), dropTargetCategory.id())) {
+                                // Remove from current list
+                                boolean removed = false;
+                                try {
+                                    removed = cur.remove(moved);
+                                } catch (Throwable t) {
+                                    Constants.LOG.warn("[{}] Drop-into: removal failed: {}", Constants.MOD_NAME, t.toString());
+                                }
+
+                                if (removed) {
+                                    try {
+                                        dropTargetCategory.childrenMutable().add(moved);
+                                        RadialMenu.persist();
+                                        Constants.LOG.debug("[{}] Dropped '{}' into category '{}'", Constants.MOD_NAME, moved.id(), dropTargetCategory.id());
+                                    } catch (Throwable t) {
+                                        Constants.LOG.warn("[{}] Drop-into: append failed: {}", Constants.MOD_NAME, t.toString());
+                                        // best effort: if failed to append, attempt to put it back where it was
+                                        try {
+                                            int safeIdx = Math.min(fromContent, cur.size());
+                                            cur.add(safeIdx, moved);
+                                        } catch (Throwable ignored) {}
+                                    }
+                                } else {
+                                    Constants.LOG.info("[{}] Drop-into: source item not removed (id='{}')", Constants.MOD_NAME, moved.id());
+                                }
+                            }
+                        }
+                    }
+                } catch (Throwable t) {
+                    Constants.LOG.warn("[{}] Drop-into exception: {}", Constants.MOD_NAME, t.toString());
+                }
+
+                // Rebuild UI and clear highlights
+                rebuildRows();
+                selectedRow = -1;
+                ensureSelectedVisible();
+
+                dropTargetCategory = null;
+                dropTargetRowIdx = -1;
+                dropAt = -1;
+                return true;
+            }
+
+            // Otherwise, perform the original reorder between rows
             if (fromRow >= 0 && toRow >= 0 && fromRow != toRow) {
                 int fromContent = rowToContentIndex(fromRow);
                 int toContent = rowToContentIndex(toRow);
@@ -698,6 +832,8 @@ public final class MenuEditorScreen extends Screen {
             }
 
             dropAt = -1;
+            dropTargetCategory = null;
+            dropTargetRowIdx = -1;
             return true;
         }
         return super.mouseReleased(mouseX, mouseY, button);
@@ -750,7 +886,6 @@ public final class MenuEditorScreen extends Screen {
         if (totalPx <= listHeight) { scrollY = 0; return; }
 
         int[] k = knobRect();
-        int trackY1 = listTop;
         int knobH = k[3] - k[1];
         int knobTop = (int)mouseY - knobH / 2;
         dragScrollTo(knobTop);
