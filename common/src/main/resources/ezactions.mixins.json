@@ -1,18 +1,18 @@
 {
     "required": true,
     "minVersion": "0.8",
-    "package": "com.example.examplemod.mixin",
+    "package": "org.z2six.ezactions.mixin",
     "refmap": "${mod_id}.refmap.json",
     "compatibilityLevel": "JAVA_17",
     "mixins": [
     ],
     "client": [
-      "org.z2six.ezactions.mixin.MixinTitleScreen"
+        "MixinMinecraft"
     ],
     "server": [
     ],
     "injectors": {
-      "defaultRequire": 1
+        "defaultRequire": 1
     }
-  }
-  
+}
+
