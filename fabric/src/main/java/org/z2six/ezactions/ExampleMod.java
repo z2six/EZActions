@@ -1,4 +1,4 @@
-package org.z2six.ezactions2;
+package org.z2six.ezactions;
 
 import net.fabricmc.api.ModInitializer;
 

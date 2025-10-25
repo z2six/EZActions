@@ -1,11 +1,20 @@
-package org.z2six.ezactions2;
+// Constants.java
+package org.z2six.ezactions;
 
+import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-public class Constants {
+/*
+ * // MainFile: Constants.java
+ * Central constants for ezactions.
+ * Keep logs here so every class can use the same logger.
+ */
+public final class Constants {
+    public static final String MOD_ID = "ezactions";
+    public static final String MOD_NAME = "ezactions";
 
-	public static final String MOD_ID = "examplemod";
-	public static final String MOD_NAME = "ExampleMod";
-	public static final Logger LOG = LoggerFactory.getLogger(MOD_NAME);
+    // Global logger for the mod
+    public static final Logger LOG = LogUtils.getLogger();
+
+    private Constants() {}
 }

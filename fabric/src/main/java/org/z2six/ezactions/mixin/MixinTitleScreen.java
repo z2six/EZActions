@@ -1,6 +1,6 @@
 package main.java.org.z2six.ezactions.mixin;
 
-import org.z2six.ezactions2.Constants;
+import org.z2six.ezactions.Constants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.TitleScreen;
 import org.spongepowered.asm.mixin.Mixin;

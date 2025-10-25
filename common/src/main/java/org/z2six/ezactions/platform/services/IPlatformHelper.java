@@ -1,4 +1,4 @@
-package org.z2six.ezactions2.platform.services;
+package org.z2six.ezactions.platform.services;
 
 public interface IPlatformHelper {
 

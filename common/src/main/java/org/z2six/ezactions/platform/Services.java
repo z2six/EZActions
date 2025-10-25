@@ -1,7 +1,7 @@
-package org.z2six.ezactions2.platform;
+package org.z2six.ezactions.platform;
 
-import org.z2six.ezactions2.Constants;
-import org.z2six.ezactions2.platform.services.IPlatformHelper;
+import org.z2six.ezactions.Constants;
+import org.z2six.ezactions.platform.services.IPlatformHelper;
 
 import java.util.ServiceLoader;
 

@@ -1,6 +1,6 @@
-package org.z2six.ezactions2;
+package org.z2six.ezactions;
 
-import org.z2six.ezactions2.platform.Services;
+import org.z2six.ezactions.platform.Services;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.Items;
 
