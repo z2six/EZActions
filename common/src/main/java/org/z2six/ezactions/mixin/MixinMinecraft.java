@@ -1,6 +1,6 @@
-package org.z2six.ezactions.mixin;
+package main.java.org.z2six.ezactions.mixin;
 
-import org.z2six.ezactions.Constants;
+import org.z2six.ezactions2.Constants;
 import net.minecraft.client.Minecraft;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;

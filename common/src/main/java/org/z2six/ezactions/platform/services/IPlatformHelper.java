@@ -1,15 +1,15 @@
-package org.z2six.ezactions.platform.services;
+package org.z2six.ezactions2.platform.services;
 
 public interface IPlatformHelper {
 
-    /**
+    /*
      * Gets the name of the current platform
      *
      * @return The name of the current platform.
      */
     String getPlatformName();
 
-    /**
+    /*
      * Checks if a mod with the given id is loaded.
      *
      * @param modId The mod to check if it is loaded.
@@ -17,14 +17,14 @@ public interface IPlatformHelper {
      */
     boolean isModLoaded(String modId);
 
-    /**
+    /*
      * Check if the game is currently in a development environment.
      *
      * @return True if in a development environment, false otherwise.
      */
     boolean isDevelopmentEnvironment();
 
-    /**
+    /*
      * Gets the name of the environment type as a string.
      *
      * @return The name of the environment type.

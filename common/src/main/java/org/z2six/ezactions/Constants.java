@@ -1,4 +1,4 @@
-package org.z2six.ezactions;
+package org.z2six.ezactions2;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
