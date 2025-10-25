@@ -16,7 +16,7 @@
     "environment": "*",
     "entrypoints": {
         "main": [
-          "com.z2six.ezactions.ExampleMod"
+          "org.z2six.ezactions.ExampleMod"
         ]
     },
     "mixins": [

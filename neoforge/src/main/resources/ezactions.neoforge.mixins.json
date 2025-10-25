@@ -1,16 +1,15 @@
 {
   "required": true,
   "minVersion": "0.8",
-  "package": "com.example.examplemod.mixin",
-  "refmap": "${mod_id}.refmap.json",
+  "package": "org.z2six.ezactions.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [],
   "client": [
-    "org.z2six.ezactions.mixin.MixinTitleScreen"
+    "NoBlurGameRendererMixin",
+    "KeyboardHandlerAccessor"
   ],
   "server": [],
   "injectors": {
     "defaultRequire": 1
   }
 }
-  
