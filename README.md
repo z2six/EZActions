@@ -147,5 +147,5 @@ This project is open source. See the license file and the docs page:
 
 ## Credits
 
-EZActions by the project authors and contributors.  
+EZActions by Z2SIX.  
 Built for (Neo)Forge with care for reliability, crash-safety, and clean UX.
