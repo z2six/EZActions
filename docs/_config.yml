@@ -1,4 +1,3 @@
-# docs/_config.yml
 title: EZActions
 description: A radial action menu for Minecraft — quick access to your keybinds, commands, and bundles.
-theme: minima   # Built-in, GitHub Pages–compatible theme
+theme: minima
