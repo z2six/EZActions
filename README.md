@@ -2,6 +2,8 @@
 
 A fast, flexible radial action menu for Minecraft. Open a wheel of actions, then trigger keybinds, run commands, or enter bundles — all without leaving the game.
 
+**Full documentation pages**: https://z2six.github.io/EZActions/
+
 - **Hold-to-open radial:** default hotkey is the backtick (`) key.
 - **No-conflict movement (optional):** keep moving while the menu is open.
 - **Drag-and-drop editor:** reorder items, nest bundles, and manage icons.
