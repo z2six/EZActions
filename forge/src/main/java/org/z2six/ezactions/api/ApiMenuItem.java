@@ -1,4 +1,4 @@
-package com.z2six.ezactions.api.model;
+package org.z2six.ezactions.api.model;
 
 import org.jetbrains.annotations.Nullable;
 

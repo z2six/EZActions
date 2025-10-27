@@ -1,6 +1,6 @@
-package com.z2six.ezactions.api.events;
+package org.z2six.ezactions.api.events;
 
-import com.z2six.ezactions.api.MenuPath;
+import org.z2six.ezactions.api.MenuPath;
 
 import java.util.ArrayList;
 import java.util.List;

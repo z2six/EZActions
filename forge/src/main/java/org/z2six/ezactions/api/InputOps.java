@@ -1,4 +1,4 @@
-package com.z2six.ezactions.api;
+package org.z2six.ezactions.api;
 
 /** Helper operations for input + command sequencing. */
 public interface InputOps {

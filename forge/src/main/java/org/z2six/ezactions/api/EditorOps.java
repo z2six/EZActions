@@ -1,4 +1,4 @@
-package com.z2six.ezactions.api;
+package org.z2six.ezactions.api;
 
 /** UI helpers. */
 public interface EditorOps {

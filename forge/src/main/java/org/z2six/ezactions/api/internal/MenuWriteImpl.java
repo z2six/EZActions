@@ -1,11 +1,11 @@
-package com.z2six.ezactions.api.internal;
+package org.z2six.ezactions.api.internal;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
-import com.z2six.ezactions.api.MenuPath;
-import com.z2six.ezactions.api.MenuWrite;
-import com.z2six.ezactions.api.model.ApiMenuItem;
+import org.z2six.ezactions.api.MenuPath;
+import org.z2six.ezactions.api.MenuWrite;
+import org.z2six.ezactions.api.model.ApiMenuItem;
 import org.z2six.ezactions.Constants;
 import org.z2six.ezactions.data.menu.MenuItem;
 import org.z2six.ezactions.data.menu.RadialMenu;

@@ -1,8 +1,8 @@
-package com.z2six.ezactions.api.internal;
+package org.z2six.ezactions.api.internal;
 
-import com.z2six.ezactions.api.MenuPath;
-import com.z2six.ezactions.api.MenuRead;
-import com.z2six.ezactions.api.model.ApiMenuItem;
+import org.z2six.ezactions.api.MenuPath;
+import org.z2six.ezactions.api.MenuRead;
+import org.z2six.ezactions.api.model.ApiMenuItem;
 import org.z2six.ezactions.data.menu.MenuItem;
 import org.z2six.ezactions.data.menu.RadialMenu;
 

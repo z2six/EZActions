@@ -1,4 +1,4 @@
-package com.z2six.ezactions.api.internal;
+package org.z2six.ezactions.api.internal;
 
 import org.z2six.ezactions.data.menu.MenuItem;
 import org.z2six.ezactions.gui.editor.menu.MenuNavUtil;

@@ -1,9 +1,9 @@
-package com.z2six.ezactions.api.internal;
+package org.z2six.ezactions.api.internal;
 
-import com.z2six.ezactions.api.EzActionsApi;
-import com.z2six.ezactions.api.ImportExport;
-import com.z2six.ezactions.api.MenuRead;
-import com.z2six.ezactions.api.MenuWrite;
+import org.z2six.ezactions.api.EzActionsApi;
+import org.z2six.ezactions.api.ImportExport;
+import org.z2six.ezactions.api.MenuRead;
+import org.z2six.ezactions.api.MenuWrite;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import org.z2six.ezactions.Constants;

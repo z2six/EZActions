@@ -1,6 +1,6 @@
-package com.z2six.ezactions.api;
+package org.z2six.ezactions.api;
 
-import com.z2six.ezactions.api.model.ApiMenuItem;
+import org.z2six.ezactions.api.model.ApiMenuItem;
 
 import java.util.List;
 import java.util.Optional;

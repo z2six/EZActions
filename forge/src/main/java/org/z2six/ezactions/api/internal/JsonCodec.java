@@ -1,4 +1,4 @@
-package com.z2six.ezactions.api.internal;
+package org.z2six.ezactions.api.internal;
 
 import com.google.gson.*;
 import org.z2six.ezactions.Constants;

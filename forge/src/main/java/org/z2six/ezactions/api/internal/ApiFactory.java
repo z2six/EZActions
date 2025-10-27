@@ -1,6 +1,6 @@
-package com.z2six.ezactions.api.internal;
+package org.z2six.ezactions.api.internal;
 
-import com.z2six.ezactions.api.EzActionsApi;
+import org.z2six.ezactions.api.EzActionsApi;
 
 /** Public bridge so api package can obtain the impl without exposing the impl class. */
 public final class ApiFactory {

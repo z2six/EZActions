@@ -1,4 +1,4 @@
-package com.z2six.ezactions.api;
+package org.z2six.ezactions.api;
 
 import net.minecraft.client.gui.screens.Screen;
 import org.z2six.ezactions.data.click.IClickAction;

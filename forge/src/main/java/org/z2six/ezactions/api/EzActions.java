@@ -1,6 +1,6 @@
-package com.z2six.ezactions.api;
+package org.z2six.ezactions.api;
 
-import com.z2six.ezactions.api.internal.EzActionsApiImpl;
+import org.z2six.ezactions.api.internal.EzActionsApiImpl;
 
 public final class EzActions {
     private EzActions() {}
