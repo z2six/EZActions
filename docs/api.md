@@ -9,7 +9,7 @@ It exposes ways to **read, import, export, and trigger actions** programmaticall
 
 EZActions is built on a **stable public API layer** found under the package:
 
-`com.z2six.ezactions.api`
+`org.z2six.ezactions.api`
 
 This API can be used to:
 
@@ -29,7 +29,7 @@ All of this is designed to be **cross-loader compatible** — the same calls wor
 To access the API, depend on EZActions in your mod and import the entry class:
 
 ```java
-import com.z2six.ezactions.api.EzActions;
+import org.z2six.ezactions.api.EzActions;
 ```
 
 You can then retrieve the API instance or call its static helpers:
