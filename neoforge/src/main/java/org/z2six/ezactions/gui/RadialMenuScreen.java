@@ -1,3 +1,4 @@
+// MainFile: src/main/java/org/z2six/ezactions/gui/RadialMenuScreen.java
 package org.z2six.ezactions.gui;
 
 import net.minecraft.client.Minecraft;
@@ -22,6 +23,10 @@ import java.util.List;
  * - Game continues; mouse is used for selection.
  * - LMB on action: close+execute; LMB on category: drill in (stay open).
  * - RMB: go back.
+ *
+ * New:
+ * - Uses RadialMenu.visibleItemsForDisplay() so items flagged hideFromMainRadial are
+ *   hidden from the root radial, while still existing in the model for bundle hotkeys.
  */
 public final class RadialMenuScreen extends Screen implements NoMenuBlurScreen {
 
@@ -48,7 +53,7 @@ public final class RadialMenuScreen extends Screen implements NoMenuBlurScreen {
     /** Called by KeyboardHandler on hotkey release (falling edge). */
     public void onHotkeyReleased() {
         try {
-            List<MenuItem> items = RadialMenu.currentItems();
+            List<MenuItem> items = RadialMenu.visibleItemsForDisplay();
             if (items != null && !items.isEmpty()
                     && hoveredIndex >= 0 && hoveredIndex < items.size()) {
                 MenuItem mi = items.get(hoveredIndex);
@@ -68,7 +73,7 @@ public final class RadialMenuScreen extends Screen implements NoMenuBlurScreen {
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         try {
-            List<MenuItem> items = RadialMenu.currentItems();
+            List<MenuItem> items = RadialMenu.visibleItemsForDisplay();
             final int cx = this.width / 2;
             final int cy = this.height / 2;
 
@@ -111,7 +116,7 @@ public final class RadialMenuScreen extends Screen implements NoMenuBlurScreen {
             }
 
             if (button == 0) { // LMB
-                List<MenuItem> items = RadialMenu.currentItems();
+                List<MenuItem> items = RadialMenu.visibleItemsForDisplay();
                 if (items == null || items.isEmpty()) return true;
                 if (hoveredIndex < 0 || hoveredIndex >= items.size()) return true;
 

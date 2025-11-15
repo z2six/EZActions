@@ -31,6 +31,12 @@ import java.util.Objects;
  *  - Both actions and categories can carry an optional "note".
  *  - Titles and notes now support rich text via Minecraft {@link Component}.
  *    Backwards compatibility: string accessors still exist and return getString().
+ *
+ * Bundle-related flags:
+ *  - hideFromMainRadial: if true, this item is hidden from the *root* radial menu.
+ *    It still exists in the menu model and can be targeted by direct bundle hotkeys.
+ *  - bundleKeybindEnabled: if true on a category, we will register a KeyMapping for it
+ *    on next restart so it can be opened directly via a hotkey.
  */
 public final class MenuItem {
 
@@ -48,6 +54,10 @@ public final class MenuItem {
     private final IClickAction action;  // null => category
     private final List<MenuItem> children; // backing, mutable list for categories
 
+    // New bundle-related flags
+    private final boolean hideFromMainRadial;
+    private final boolean bundleKeybindEnabled;
+
     // ------------ Constructors ------------
 
     public MenuItem(String id,
@@ -62,7 +72,9 @@ public final class MenuItem {
                 safeLiteral(note),
                 icon,
                 action,
-                children
+                children,
+                false,
+                false
         );
     }
 
@@ -73,6 +85,27 @@ public final class MenuItem {
                     IconSpec icon,
                     IClickAction action,
                     List<MenuItem> children) {
+        this(
+                id,
+                title,
+                note,
+                icon,
+                action,
+                children,
+                false,
+                false
+        );
+    }
+
+    /** Full constructor including bundle flags. */
+    public MenuItem(String id,
+                    Component title,
+                    Component note,
+                    IconSpec icon,
+                    IClickAction action,
+                    List<MenuItem> children,
+                    boolean hideFromMainRadial,
+                    boolean bundleKeybindEnabled) {
         this.id = Objects.requireNonNullElse(id, "item_" + Long.toUnsignedString(System.nanoTime(), 36));
 
         this.titleC = title == null ? Component.literal("Unnamed") : title;
@@ -90,6 +123,9 @@ public final class MenuItem {
         } else {
             this.children = new ArrayList<>(children);
         }
+
+        this.hideFromMainRadial = hideFromMainRadial;
+        this.bundleKeybindEnabled = bundleKeybindEnabled;
     }
 
     /** Backward-compat constructor (no note provided). */
@@ -99,6 +135,27 @@ public final class MenuItem {
                     IClickAction action,
                     List<MenuItem> children) {
         this(id, title, "", icon, action, children);
+    }
+
+    /** Full String-based constructor including bundle flags. */
+    public MenuItem(String id,
+                    String title,
+                    String note,
+                    IconSpec icon,
+                    IClickAction action,
+                    List<MenuItem> children,
+                    boolean hideFromMainRadial,
+                    boolean bundleKeybindEnabled) {
+        this(
+                id,
+                safeLiteral(title),
+                safeLiteral(note),
+                icon,
+                action,
+                children,
+                hideFromMainRadial,
+                bundleKeybindEnabled
+        );
     }
 
     // ------------ Accessors ------------
@@ -136,13 +193,24 @@ public final class MenuItem {
         return action == null;
     }
 
+    /** Whether this item should be hidden from the main radial root. */
+    public boolean hideFromMainRadial() {
+        return hideFromMainRadial;
+    }
+
+    /** Whether this category should get its own keybind (registered at next restart). */
+    public boolean bundleKeybindEnabled() {
+        return bundleKeybindEnabled;
+    }
+
     // ------------ Updaters (copy-with) ------------
 
     /** Return a copy with a different icon. Never crashes. */
     public MenuItem withIcon(IconSpec newIcon) {
         try {
             IconSpec use = (newIcon == null) ? IconSpec.item("minecraft:stone") : newIcon;
-            return new MenuItem(this.id, this.titleC, this.noteC, use, this.action, this.children);
+            return new MenuItem(this.id, this.titleC, this.noteC, use, this.action, this.children,
+                    this.hideFromMainRadial, this.bundleKeybindEnabled);
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] MenuItem.withIcon failed: {}", Constants.MOD_NAME, t.toString());
             return this;
@@ -154,36 +222,54 @@ public final class MenuItem {
         Component use = (newTitle == null || newTitle.isBlank())
                 ? this.titleC
                 : Component.literal(newTitle);
-        return new MenuItem(this.id, use, this.noteC, this.icon, this.action, this.children);
+        return new MenuItem(this.id, use, this.noteC, this.icon, this.action, this.children,
+                this.hideFromMainRadial, this.bundleKeybindEnabled);
     }
 
     /** Return a copy with a different title (Component). */
     public MenuItem withTitle(Component newTitle) {
         Component use = (newTitle == null) ? this.titleC : newTitle;
-        return new MenuItem(this.id, use, this.noteC, this.icon, this.action, this.children);
+        return new MenuItem(this.id, use, this.noteC, this.icon, this.action, this.children,
+                this.hideFromMainRadial, this.bundleKeybindEnabled);
     }
 
     /** Return a copy with a different note (String). */
     public MenuItem withNote(String newNote) {
         Component use = (newNote == null) ? Component.literal("") : Component.literal(newNote);
-        return new MenuItem(this.id, this.titleC, use, this.icon, this.action, this.children);
+        return new MenuItem(this.id, this.titleC, use, this.icon, this.action, this.children,
+                this.hideFromMainRadial, this.bundleKeybindEnabled);
     }
 
     /** Return a copy with a different note (Component). */
     public MenuItem withNote(Component newNote) {
         Component use = (newNote == null) ? Component.literal("") : newNote;
-        return new MenuItem(this.id, this.titleC, use, this.icon, this.action, this.children);
+        return new MenuItem(this.id, this.titleC, use, this.icon, this.action, this.children,
+                this.hideFromMainRadial, this.bundleKeybindEnabled);
     }
 
     /** Return a copy with a different action (converts category->action if non-null). */
     public MenuItem withAction(IClickAction newAction) {
-        // when this becomes an action, children should be empty; preserve note
-        return new MenuItem(this.id, this.titleC, this.noteC, this.icon, newAction, Collections.emptyList());
+        // when this becomes an action, children should be empty; preserve note + flags
+        return new MenuItem(this.id, this.titleC, this.noteC, this.icon, newAction,
+                Collections.emptyList(), this.hideFromMainRadial, this.bundleKeybindEnabled);
     }
 
-    /** Return a copy with different children (converts to category; preserve note). */
+    /** Return a copy with different children (converts to category; preserve note + flags). */
     public MenuItem withChildren(List<MenuItem> newChildren) {
-        return new MenuItem(this.id, this.titleC, this.noteC, this.icon, null, newChildren);
+        return new MenuItem(this.id, this.titleC, this.noteC, this.icon, null, newChildren,
+                this.hideFromMainRadial, this.bundleKeybindEnabled);
+    }
+
+    /** Return a copy with updated bundle visibility flag. */
+    public MenuItem withHideFromMainRadial(boolean hide) {
+        return new MenuItem(this.id, this.titleC, this.noteC, this.icon, this.action, this.children,
+                hide, this.bundleKeybindEnabled);
+    }
+
+    /** Return a copy with updated bundle keybind flag. */
+    public MenuItem withBundleKeybindEnabled(boolean enabled) {
+        return new MenuItem(this.id, this.titleC, this.noteC, this.icon, this.action, this.children,
+                this.hideFromMainRadial, enabled);
     }
 
     // ------------ JSON (de)serialization ------------
@@ -205,6 +291,14 @@ public final class MenuItem {
             // Optional note
             if (this.noteC != null && !this.noteStr.isEmpty()) {
                 o.add("note", serializeComponent(this.noteC));
+            }
+
+            // Bundle flags (only write when true to keep older files tidy)
+            if (this.hideFromMainRadial) {
+                o.addProperty("hideFromMainRadial", true);
+            }
+            if (this.bundleKeybindEnabled) {
+                o.addProperty("bundleKeybindEnabled", true);
             }
 
             if (this.action != null) {
@@ -238,6 +332,10 @@ public final class MenuItem {
                 noteC = readComponent(o.get("note"), Component.literal(""));
             }
 
+            // Bundle flags (backwards compatible; default false)
+            boolean hideFromMainRadial = getBoolean(o, "hideFromMainRadial", false);
+            boolean bundleKeybindEnabled = getBoolean(o, "bundleKeybindEnabled", false);
+
             IClickAction action = null;
             List<MenuItem> children = Collections.emptyList();
 
@@ -253,12 +351,13 @@ public final class MenuItem {
                 children = list;
             }
 
-            return new MenuItem(id, titleC, noteC, IconSpec.item(iconId), action, children);
+            return new MenuItem(id, titleC, noteC, IconSpec.item(iconId), action, children,
+                    hideFromMainRadial, bundleKeybindEnabled);
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] MenuItem.deserialize failed: {}", Constants.MOD_NAME, t.toString());
             // return a safe placeholder so the menu keeps working
             return new MenuItem("invalid", Component.literal("Invalid"), Component.literal(""),
-                    IconSpec.item("minecraft:barrier"), null, Collections.emptyList());
+                    IconSpec.item("minecraft:barrier"), null, Collections.emptyList(), false, false);
         }
     }
 
@@ -266,6 +365,15 @@ public final class MenuItem {
         try {
             if (o.has(key) && o.get(key).isJsonPrimitive()) {
                 return o.get(key).getAsString();
+            }
+        } catch (Throwable ignored) {}
+        return def;
+    }
+
+    private static boolean getBoolean(JsonObject o, String key, boolean def) {
+        try {
+            if (o.has(key) && o.get(key).isJsonPrimitive()) {
+                return o.get(key).getAsJsonPrimitive().getAsBoolean();
             }
         } catch (Throwable ignored) {}
         return def;
@@ -309,12 +417,14 @@ public final class MenuItem {
 
     /** Create an action item. */
     public static MenuItem action(String id, String title, String note, IconSpec icon, IClickAction act) {
-        return new MenuItem(id, safeLiteral(title), safeLiteral(note), icon, act, Collections.emptyList());
+        return new MenuItem(id, safeLiteral(title), safeLiteral(note), icon, act, Collections.emptyList(),
+                false, false);
     }
 
     /** Create a category item (page). Note: callers that care about notes can use the main constructor. */
     public static MenuItem category(String id, String title, IconSpec icon, List<MenuItem> children) {
-        return new MenuItem(id, safeLiteral(title), Component.literal(""), icon, null, children);
+        return new MenuItem(id, safeLiteral(title), Component.literal(""), icon, null, children,
+                false, false);
     }
 
     @Override
@@ -327,6 +437,8 @@ public final class MenuItem {
                 ", icon=" + (icon == null ? "null" : icon.id()) +
                 ", action=" + (action == null ? "<category>" : action.getType()) +
                 ", children=" + childCount +
+                ", hideFromMainRadial=" + hideFromMainRadial +
+                ", bundleKeybindEnabled=" + bundleKeybindEnabled +
                 '}';
     }
 }

@@ -11,6 +11,13 @@ import java.util.*;
 /**
  * Holds the menu model and opens the radial as a Screen (mouse free, gameplay input blocked).
  * Visual blur is disabled for our screens via the NoBlur mixin.
+ *
+ * New responsibilities:
+ *  - openAtBundle(id): open the radial starting *inside* a specific category (bundle).
+ *  - visibleItemsForDisplay(): view used by RadialMenuScreen that hides bundles flagged
+ *    hideFromMainRadial on the root page.
+ *  - isBundleNameTaken(): global check used by the editor to enforce unique bundle IDs
+ *    (since bundle id == bundle title).
  */
 public final class RadialMenu {
 
@@ -46,6 +53,49 @@ public final class RadialMenu {
             mc.setScreen(new RadialMenuScreen());
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] Failed to open radial: {}", Constants.MOD_NAME, t.toString());
+        }
+    }
+
+    /**
+     * Open the radial starting at the category (bundle) with the given ID.
+     * ID is expected to equal the bundle title (enforced by the editor).
+     *
+     * - If the bundle is found, PATH will contain the categories on the path from root to the target.
+     * - If not found, falls back to open() at root.
+     */
+    public static void openAtBundle(String bundleId) {
+        try {
+            final Minecraft mc = Minecraft.getInstance();
+            if (mc == null || mc.player == null || mc.level == null) {
+                Constants.LOG.debug("[{}] openAtBundle ignored: client/world not ready.", Constants.MOD_NAME);
+                return;
+            }
+            if (mc.screen != null || mc.isPaused()) {
+                final String scr = (mc.screen == null) ? "none" : mc.screen.getClass().getSimpleName();
+                Constants.LOG.debug("[{}] openAtBundle ignored: screen={}, paused={}, bundleId={}",
+                        Constants.MOD_NAME, scr, mc.isPaused(), bundleId);
+                return;
+            }
+
+            ensureLoaded();
+            PATH.clear();
+
+            List<MenuItem> path = findPathToCategory(bundleId);
+            if (path == null || path.isEmpty()) {
+                Constants.LOG.info("[{}] Bundle '{}' not found; opening radial at root instead.", Constants.MOD_NAME, bundleId);
+                mc.setScreen(new RadialMenuScreen());
+                return;
+            }
+
+            for (MenuItem cat : path) {
+                PATH.addLast(cat);
+            }
+
+            Constants.LOG.debug("[{}] openAtBundle resolved path depth={} for id='{}'", Constants.MOD_NAME, PATH.size(), bundleId);
+            mc.setScreen(new RadialMenuScreen());
+        } catch (Throwable t) {
+            Constants.LOG.warn("[{}] openAtBundle failed for '{}': {}", Constants.MOD_NAME, bundleId, t.toString());
+            open();
         }
     }
 
@@ -91,7 +141,7 @@ public final class RadialMenu {
         if (!PATH.isEmpty()) PATH.removeLast();
     }
 
-    /** Returns the current page's mutable list. */
+    /** Returns the current page's mutable list (full model; editor uses this). */
     public static List<MenuItem> currentItems() {
         ensureLoaded();
         List<MenuItem> items = ROOT;
@@ -100,6 +150,37 @@ public final class RadialMenu {
             items = cat.childrenMutable();
         }
         return items;
+    }
+
+    /**
+     * Returns the list of items to be shown in the radial UI for the current page.
+     *
+     * - On root (PATH empty), items with hideFromMainRadial==true are filtered out.
+     * - On deeper pages, items are returned as-is.
+     *
+     * This keeps the editor/model operating on the full list via currentItems(),
+     * while RadialMenuScreen uses this filtered view.
+     */
+    public static List<MenuItem> visibleItemsForDisplay() {
+        try {
+            List<MenuItem> base = currentItems();
+            if (base == null) return Collections.emptyList();
+
+            if (PATH.isEmpty()) {
+                List<MenuItem> out = new ArrayList<>(base.size());
+                for (MenuItem mi : base) {
+                    if (mi == null) continue;
+                    if (mi.hideFromMainRadial()) continue;
+                    out.add(mi);
+                }
+                return out;
+            }
+
+            return base;
+        } catch (Throwable t) {
+            Constants.LOG.warn("[{}] visibleItemsForDisplay failed: {}", Constants.MOD_NAME, t.toString());
+            return Collections.emptyList();
+        }
     }
 
     /** Human-friendly titles for breadcrumb UI: ["root", "Cat1", "Sub", ...]. */
@@ -238,5 +319,74 @@ public final class RadialMenu {
                     Constants.MOD_NAME, from, to, t.toString());
             return false;
         }
+    }
+
+    // --- Bundle helpers ---
+
+    /**
+     * Check whether a bundle name (id) is already used by another category in the tree.
+     *
+     * - Only categories (action == null) are considered "bundles" for this purpose.
+     * - The 'self' entry (currently being edited) is ignored so you can re-save with the same name.
+     */
+    public static boolean isBundleNameTaken(String candidateId, MenuItem self) {
+        try {
+            ensureLoaded();
+            if (candidateId == null) return false;
+            String id = candidateId.trim();
+            if (id.isEmpty()) return false;
+            return isBundleNameTakenInList(ROOT, id, self);
+        } catch (Throwable t) {
+            Constants.LOG.warn("[{}] isBundleNameTaken failed for '{}': {}", Constants.MOD_NAME, candidateId, t.toString());
+            return false;
+        }
+    }
+
+    private static boolean isBundleNameTakenInList(List<MenuItem> list, String id, MenuItem self) {
+        if (list == null) return false;
+        for (MenuItem mi : list) {
+            if (mi == null) continue;
+            if (mi.isCategory()) {
+                if (mi != self && id.equals(mi.id())) {
+                    return true;
+                }
+                if (isBundleNameTakenInList(mi.childrenMutable(), id, self)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Find a path of categories from root to the category with the given id. */
+    private static List<MenuItem> findPathToCategory(String bundleId) {
+        List<MenuItem> path = new ArrayList<>();
+        for (MenuItem rootChild : ROOT) {
+            if (rootChild == null) continue;
+            if (dfsCategory(rootChild, bundleId, path)) {
+                return path;
+            }
+        }
+        return null;
+    }
+
+    private static boolean dfsCategory(MenuItem current, String bundleId, List<MenuItem> path) {
+        if (current == null || !current.isCategory()) return false;
+        path.add(current);
+        try {
+            if (Objects.equals(current.id(), bundleId)) {
+                return true;
+            }
+            for (MenuItem child : current.children()) {
+                if (dfsCategory(child, bundleId, path)) {
+                    return true;
+                }
+            }
+        } catch (Throwable t) {
+            Constants.LOG.debug("[{}] dfsCategory error on '{}': {}", Constants.MOD_NAME, current.id(), t.toString());
+        }
+        // backtrack
+        path.remove(path.size() - 1);
+        return false;
     }
 }

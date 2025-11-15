@@ -1,8 +1,10 @@
 // MainFile: src/main/java/org/z2six/ezactions/gui/editor/CategoryEditScreen.java
 package org.z2six.ezactions.gui.editor;
 
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Checkbox;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -18,7 +20,9 @@ import java.util.List;
 /**
  * // MainFile: src/main/java/org/z2six/ezactions/gui/editor/CategoryEditScreen.java
  *
- * Editor for Category (Bundle) items, now with Note support.
+ * Editor for Category (Bundle) items, now with Note support and bundle flags:
+ *  - Hide from main radial
+ *  - Enable keybind (register bundle key on next restart)
  *
  * Field spacing per row:
  *   Label
@@ -50,10 +54,17 @@ public final class CategoryEditScreen extends Screen {
     private String draftTitle = "";
     private String draftNote  = "";
     private IconSpec draftIcon = IconSpec.item("minecraft:stone");
+    private boolean draftHideFromMainRadial = false;
+    private boolean draftEnableKeybind = false;
 
     // Widgets
     private EditBox titleBox;
     private EditBox noteBox;
+    private Checkbox hideFromMainCheckbox;
+    private Checkbox enableKeybindCheckbox;
+
+    // "Applied on next restart" hint (only when toggling Enable keybind)
+    private boolean showRestartHint = false;
 
     public CategoryEditScreen(Screen parent, MenuItem editing) {
         super(Component.literal(editing == null ? "Add Bundle" : "Edit Bundle"));
@@ -64,6 +75,10 @@ public final class CategoryEditScreen extends Screen {
             this.draftTitle = safe(editing.title());
             try { this.draftNote = safe(editing.note()); } catch (Throwable ignored) {}
             if (editing.icon() != null) this.draftIcon = editing.icon();
+            try {
+                this.draftHideFromMainRadial = editing.hideFromMainRadial();
+                this.draftEnableKeybind = editing.bundleKeybindEnabled();
+            } catch (Throwable ignored) {}
         }
     }
 
@@ -90,6 +105,34 @@ public final class CategoryEditScreen extends Screen {
         noteBox.setValue(draftNote);
         noteBox.setResponder(s -> draftNote = safe(s));
         addRenderableWidget(noteBox);
+        y += 20;
+
+        // --- Bundle flags (checkboxes) ---
+
+        // Small offset before checkboxes
+        y += 6;
+
+        // Hide from main radial
+        hideFromMainCheckbox = Checkbox.builder(Component.literal("Hide from main radial"), this.font)
+                .pos(cx - 140, y)
+                .selected(draftHideFromMainRadial)
+                .onValueChange((cb, value) -> draftHideFromMainRadial = value)
+                .maxWidth(280)
+                .build();
+        addRenderableWidget(hideFromMainCheckbox);
+        y += 20 + 4;
+
+        // Enable keybind
+        enableKeybindCheckbox = Checkbox.builder(Component.literal("Enable keybind"), this.font)
+                .pos(cx - 140, y)
+                .selected(draftEnableKeybind)
+                .onValueChange((cb, value) -> {
+                    draftEnableKeybind = value;
+                    showRestartHint = true; // show red "applied on next restart" text
+                })
+                .maxWidth(280)
+                .build();
+        addRenderableWidget(enableKeybindCheckbox);
         y += 20;
 
         // --- Button rows stack ---
@@ -125,6 +168,21 @@ public final class CategoryEditScreen extends Screen {
                 return;
             }
 
+            // Enforce "bundle id == bundle title" and ensure global uniqueness across categories.
+            String newId = draftTitle;
+
+            if (RadialMenu.isBundleNameTaken(newId, editing)) {
+                Constants.LOG.warn("[{}] CategoryEdit: Duplicate bundle title/id '{}' detected; save aborted.",
+                        Constants.MOD_NAME, newId);
+                // Optional UX: mark title as invalid (no hard error popup to keep it simple)
+                try {
+                    if (titleBox != null) {
+                        titleBox.setTextColor(0xFFFF5555);
+                    }
+                } catch (Throwable ignored) {}
+                return;
+            }
+
             // Preserve children if editing an existing category
             List<MenuItem> children = new ArrayList<>();
             if (editing != null) {
@@ -135,14 +193,19 @@ public final class CategoryEditScreen extends Screen {
                 }
             }
 
-            // NOTE: assumes your MenuItem constructor supports: (id, title, note, icon, action, children)
+            boolean hideFlag = draftHideFromMainRadial;
+            boolean keybindFlag = draftEnableKeybind;
+
+            // NOTE: id == title; keybinds will reference this id by name
             MenuItem newItem = new MenuItem(
-                    editing != null ? editing.id() : MenuEditorScreen.freshId("cat"),
+                    newId,
                     draftTitle,
                     draftNote,
                     draftIcon,
-                    null, // action == null => category
-                    children
+                    null, // action == null => category (bundle)
+                    children,
+                    hideFlag,
+                    keybindFlag
             );
 
             boolean ok = (editing == null)
@@ -188,6 +251,14 @@ public final class CategoryEditScreen extends Screen {
         try {
             IconRenderer.drawIcon(g, bx + boxW / 2, by + boxH / 2 + 6, draftIcon);
         } catch (Throwable ignored) {}
+
+        // Restart hint (only when Enable keybind was toggled)
+        if (showRestartHint && enableKeybindCheckbox != null) {
+            int hx = enableKeybindCheckbox.getX();
+            int hy = enableKeybindCheckbox.getY() + 22;
+            Component msg = Component.literal("Applied on next restart").withStyle(ChatFormatting.RED);
+            g.drawString(this.font, msg.getString(), hx, hy, 0xFFFF5555);
+        }
 
         super.render(g, mouseX, mouseY, partialTick);
     }

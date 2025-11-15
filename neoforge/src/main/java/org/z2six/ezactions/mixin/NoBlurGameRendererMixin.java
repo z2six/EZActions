@@ -8,38 +8,42 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.z2six.ezactions.Constants;
 import org.z2six.ezactions.gui.noblur.NoMenuBlurScreen;
 
 /**
- * // MainFile: NoBlurGameRendererMixin.java
- * Cancels the menu blur pass for our screens.
- * Primary check: implements NoMenuBlurScreen.
- * Secondary safety: package-prefix check to catch any new screens we add.
+ * Cancels the menu blur pass for our screens only.
+ * - Lower priority so shader/renderer mods can hook first.
+ * - Optional injections (require=0/expect=0) so we never hard-fail if names change.
  */
-@Mixin(GameRenderer.class)
+@Mixin(value = GameRenderer.class, priority = 100) // default is 1000; lower number = applied later
 public abstract class NoBlurGameRendererMixin {
+    /*
+    // Mapping 1: present on some 1.21.1 mappings
+    @Inject(method = "processBlurEffect", at = @At("HEAD"), cancellable = true, require = 0, expect = 0)
+    private void ezactions$skipMenuBlur$process(float delta, CallbackInfo ci) {
+        cancelIfOurScreen(ci);
+    }
 
-    @Inject(method = {"processBlurEffect", "renderBlur"}, at = @At("HEAD"), cancellable = true)
-    private void ezactions$skipMenuBlur(float delta, CallbackInfo ci) {
-        try {
-            Minecraft mc = Minecraft.getInstance();
-            Screen s = mc.screen;
-            if (s == null) return;
+    // Mapping 2: present on other mapping sets / forks
+    @Inject(method = "renderBlur", at = @At("HEAD"), cancellable = true, require = 0, expect = 0)
+    private void ezactions$skipMenuBlur$render(float delta, CallbackInfo ci) {
+        cancelIfOurScreen(ci);
+    }
 
-            // Primary: explicit marker
-            if (s instanceof NoMenuBlurScreen) {
-                ci.cancel();
-                return;
-            }
-            // Secondary: any of our screens, even if someone forgot the marker
-            String cn = s.getClass().getName();
-            if (cn != null && cn.startsWith("org.z2six.ezactions.")) {
-                ci.cancel();
-            }
-        } catch (Throwable t) {
-            // Never break rendering; just log.
-            Constants.LOG.warn("[{}] NoBlur mixin failed: {}", Constants.MOD_NAME, t.toString());
+    private static void cancelIfOurScreen(CallbackInfo ci) {
+        Screen s = Minecraft.getInstance().screen;
+        if (s == null) return;
+
+        if (s instanceof NoMenuBlurScreen) {
+            ci.cancel();
+            return;
+        }
+        // Safety: any of our screens, in case someone forgets the marker interface
+        String cn = s.getClass().getName();
+        if (cn != null && cn.startsWith("org.z2six.ezactions.")) {
+            ci.cancel();
         }
     }
+
+     */
 }

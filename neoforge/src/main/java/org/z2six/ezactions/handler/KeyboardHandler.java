@@ -16,8 +16,11 @@ import org.z2six.ezactions.gui.RadialMenuScreen;
 import org.z2six.ezactions.helper.ClientTaskQueue;
 import org.z2six.ezactions.helper.InputInjector;
 import org.z2six.ezactions.helper.KeyboardHandlerHelper;
+import org.z2six.ezactions.util.BundleHotkeyManager;
 import org.z2six.ezactions.util.CommandSequencer;
 import org.z2six.ezactions.util.EZActionsKeybinds;
+
+import java.util.Map;
 
 /**
  * HOLD-to-open radial with optional movement passthrough (toggle in general-client.toml).
@@ -27,6 +30,11 @@ import org.z2six.ezactions.util.EZActionsKeybinds;
  *     * mirror physical key state into KeyMapping#setDown during PRE and POST ticks
  * - If false, we do not alter contexts or mirror movement keys.
  * - Always restores original contexts on close. Never crashes; logs and skips on errors.
+ *
+ * New behavior:
+ * - Supports per-bundle hotkeys. When a bundle key is pressed, we open the radial directly
+ *   at that bundle (using RadialMenu.openAtBundle(id)). Semantics remain HOLD-to-open:
+ *   keep the key down to keep the radial open; release to close and (optionally) execute.
  */
 public final class KeyboardHandler {
 
@@ -52,13 +60,39 @@ public final class KeyboardHandler {
             final Minecraft mc = Minecraft.getInstance();
             if (mc == null || mc.player == null) return;
 
-            boolean heldNow = isPhysicallyDown(mc, EZActionsKeybinds.OPEN_MENU);
+            // --- Determine which "open radial" hotkey (if any) is currently physically DOWN ---
 
-            if (heldNow && !openHeldPrev && !suppressUntilRelease) {
-                Constants.LOG.debug("[{}] Radial hotkey pressed; opening at root.", Constants.MOD_NAME);
-                RadialMenu.open();
+            boolean rootDown = EZActionsKeybinds.OPEN_MENU != null
+                    && isPhysicallyDown(mc, EZActionsKeybinds.OPEN_MENU);
+
+            String bundleIdDown = null;
+            if (!rootDown) {
+                // Only bother scanning bundle keys when the root key is not pressed
+                for (Map.Entry<String, KeyMapping> entry : BundleHotkeyManager.getBundleKeyMappings().entrySet()) {
+                    KeyMapping mapping = entry.getValue();
+                    if (mapping == null) continue;
+                    if (isPhysicallyDown(mc, mapping)) {
+                        bundleIdDown = entry.getKey();
+                        break;
+                    }
+                }
             }
 
+            boolean heldNow = rootDown || bundleIdDown != null;
+
+            // Rising edge -> open radial (root or specific bundle), unless suppressed
+            if (heldNow && !openHeldPrev && !suppressUntilRelease) {
+                if (bundleIdDown != null) {
+                    Constants.LOG.debug("[{}] Radial bundle hotkey pressed; opening at bundle '{}'.",
+                            Constants.MOD_NAME, bundleIdDown);
+                    RadialMenu.openAtBundle(bundleIdDown);
+                } else {
+                    Constants.LOG.debug("[{}] Radial root hotkey pressed; opening at root.", Constants.MOD_NAME);
+                    RadialMenu.open();
+                }
+            }
+
+            // Falling edge -> notify screen + cleanup + clear suppression
             if (!heldNow && openHeldPrev) {
                 if (mc.screen instanceof RadialMenuScreen s) {
                     s.onHotkeyReleased();
@@ -83,6 +117,7 @@ public final class KeyboardHandler {
                 popMovementKeyContexts(mc);
             }
 
+            // Editor keybind (separate from radial)
             if (EZActionsKeybinds.OPEN_EDITOR != null && EZActionsKeybinds.OPEN_EDITOR.consumeClick()) {
                 mc.setScreen(new org.z2six.ezactions.gui.editor.MenuEditorScreen(mc.screen));
             }
@@ -111,7 +146,7 @@ public final class KeyboardHandler {
 
     // --- physical key state helpers ---
 
-    private static boolean isPhysicallyDown(Minecraft mc, KeyMapping mapping) {
+    public static boolean isPhysicallyDown(Minecraft mc, KeyMapping mapping) {
         if (mapping == null || mc == null || mc.getWindow() == null) return false;
         long window = mc.getWindow().getWindow();
         if (window == 0L) return false;
