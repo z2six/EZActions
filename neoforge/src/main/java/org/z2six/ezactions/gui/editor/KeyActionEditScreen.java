@@ -51,6 +51,11 @@ public final class KeyActionEditScreen extends Screen {
     private static final int FIRST_BUTTON_ROW_OFFSET = 10; // after last field to first button row
     private static final int BETWEEN_BUTTON_ROWS = 5;      // between successive button rows
 
+    // New: text length limits (MC EditBox defaults to 32 if unset)
+    private static final int MAX_LEN_TITLE   = 128;
+    private static final int MAX_LEN_NOTE    = 512;
+    private static final int MAX_LEN_MAPPING = 512;
+
     // Construction
     private final Screen parent;
     private final MenuItem editing;        // null => creating new
@@ -101,6 +106,7 @@ public final class KeyActionEditScreen extends Screen {
 
         // Title field
         titleBox = new EditBox(this.font, cx - (FIELD_W / 2), y, FIELD_W, FIELD_H, Component.literal("Title"));
+        titleBox.setMaxLength(MAX_LEN_TITLE);
         titleBox.setValue(draftTitle);
         titleBox.setHint(Component.literal("Title (e.g., Inventory)"));
         titleBox.setResponder(s -> draftTitle = safe(s));
@@ -109,6 +115,7 @@ public final class KeyActionEditScreen extends Screen {
 
         // Note field
         noteBox = new EditBox(this.font, cx - (FIELD_W / 2), y, FIELD_W, FIELD_H, Component.literal("Note"));
+        noteBox.setMaxLength(MAX_LEN_NOTE);
         noteBox.setValue(draftNote);
         noteBox.setHint(Component.literal("Optional note (tooltip in editor)"));
         noteBox.setResponder(s -> draftNote = safe(s));
@@ -117,11 +124,15 @@ public final class KeyActionEditScreen extends Screen {
 
         // Mapping field
         mappingBox = new EditBox(this.font, cx - (FIELD_W / 2), y, FIELD_W, FIELD_H, Component.literal("Mapping Name"));
+        mappingBox.setMaxLength(MAX_LEN_MAPPING); // <-- fix: allow long key mapping ids
         mappingBox.setValue(draftMapping);
         mappingBox.setHint(Component.literal("KeyMapping id (e.g., key.inventory)"));
         mappingBox.setResponder(s -> draftMapping = safe(s));
         addRenderableWidget(mappingBox);
         y += FIELD_H;
+
+        Constants.LOG.debug("[{}] KeyActionEdit: max lengths set (title={}, note={}, mapping={}).",
+                Constants.MOD_NAME, MAX_LEN_TITLE, MAX_LEN_NOTE, MAX_LEN_MAPPING);
 
         // --- Button rows stack ---
         // 1) First button row starts 10px after last field
