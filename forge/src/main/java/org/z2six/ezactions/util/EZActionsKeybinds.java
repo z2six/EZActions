@@ -7,10 +7,12 @@ import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 import org.lwjgl.glfw.GLFW;
 import org.z2six.ezactions.Constants;
 
-/*
+/**
  * Registers the ezactions keybinds.
  * - OPEN_MENU: backtick by default
  * - OPEN_EDITOR: UNBOUND by default (user can assign)
+ * - Bundle keybinds: dynamically created per bundle with "Enable keybind" checked
+ *   (registered based on last saved menu, applied on next restart).
  */
 public final class EZActionsKeybinds {
 
@@ -19,7 +21,7 @@ public final class EZActionsKeybinds {
 
     private EZActionsKeybinds() {}
 
-    /* MOD-bus listener (no annotations). */
+    /** MOD-bus listener (no annotations). */
     public static void onRegisterKeyMappings(RegisterKeyMappingsEvent e) {
         try {
             OPEN_MENU = new KeyMapping(
@@ -31,13 +33,19 @@ public final class EZActionsKeybinds {
 
             OPEN_EDITOR = new KeyMapping(
                     "key.ezactions.open_editor",
-                    InputConstants.UNKNOWN.getValue(), // default: unbound (-1)
+                    InputConstants.UNKNOWN.getValue(), // default: unbound
                     "key.categories.ezactions"
             );
             e.register(OPEN_EDITOR);
 
-            Constants.LOG.debug("[{}] Registered keybinds: {}, {}", Constants.MOD_NAME,
-                    OPEN_MENU.getName(), OPEN_EDITOR.getName());
+            // Per-bundle keybinds (based on last-saved menu; applied on next restart)
+            BundleHotkeyManager.registerBundleKeyMappings(e);
+
+            Constants.LOG.debug("[{}] Registered keybinds: {}, {} (plus {} bundle keybind(s)).",
+                    Constants.MOD_NAME,
+                    OPEN_MENU.getName(),
+                    OPEN_EDITOR.getName(),
+                    BundleHotkeyManager.getBundleKeyMappings().size());
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] Failed to register keybinds: {}", Constants.MOD_NAME, t.toString());
         }

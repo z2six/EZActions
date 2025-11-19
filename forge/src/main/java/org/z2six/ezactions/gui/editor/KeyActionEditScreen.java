@@ -120,6 +120,7 @@ public final class KeyActionEditScreen extends Screen {
         mappingBox.setValue(draftMapping);
         mappingBox.setHint(Component.literal("KeyMapping id (e.g., key.inventory)"));
         mappingBox.setResponder(s -> draftMapping = safe(s));
+        mappingBox.setMaxLength(256); // allow long/qualified mapping names (fix)
         addRenderableWidget(mappingBox);
         y += FIELD_H;
 

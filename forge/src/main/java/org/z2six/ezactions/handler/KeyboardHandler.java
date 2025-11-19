@@ -25,6 +25,11 @@ import org.z2six.ezactions.config.GeneralClientConfig;
 // NEW: sequencer tick
 import org.z2six.ezactions.util.CommandSequencer;
 
+// NEW: bundle hotkeys
+import org.z2six.ezactions.util.BundleHotkeyManager;
+
+import java.util.Map;
+
 /*
  * HOLD-to-open radial with optional movement passthrough (toggle in general-client.toml).
  *
@@ -33,6 +38,11 @@ import org.z2six.ezactions.util.CommandSequencer;
  *     * mirror physical key state into KeyMapping#setDown during START and END client ticks
  * - If false, we do not alter contexts or mirror movement keys.
  * - Always restores original contexts on close. Never crashes; logs and skips on errors.
+ *
+ * New behavior (ported from Neo):
+ * - Supports per-bundle hotkeys. When a bundle key is pressed, we open the radial directly
+ *   at that bundle (using RadialMenu.openAtBundle(id)). Semantics remain HOLD-to-open:
+ *   keep the key down to keep the radial open; release to close and (optionally) execute.
  */
 public final class KeyboardHandler {
 
@@ -60,13 +70,38 @@ public final class KeyboardHandler {
             final Minecraft mc = Minecraft.getInstance();
             if (mc == null || mc.player == null) return;
 
-            boolean heldNow = isPhysicallyDown(mc, EZActionsKeybinds.OPEN_MENU);
+            // --- Determine which "open radial" hotkey (if any) is currently physically DOWN ---
+            boolean rootDown = EZActionsKeybinds.OPEN_MENU != null
+                    && isPhysicallyDown(mc, EZActionsKeybinds.OPEN_MENU);
 
-            if (heldNow && !openHeldPrev && !suppressUntilRelease) {
-                Constants.LOG.debug("[{}] Radial hotkey pressed; opening at root.", Constants.MOD_NAME);
-                RadialMenu.open();
+            String bundleIdDown = null;
+            if (!rootDown) {
+                // Only bother scanning bundle keys when the root key is not pressed
+                for (Map.Entry<String, KeyMapping> entry : BundleHotkeyManager.getBundleKeyMappings().entrySet()) {
+                    KeyMapping mapping = entry.getValue();
+                    if (mapping == null) continue;
+                    if (isPhysicallyDown(mc, mapping)) {
+                        bundleIdDown = entry.getKey();
+                        break;
+                    }
+                }
             }
 
+            boolean heldNow = rootDown || bundleIdDown != null;
+
+            // Rising edge -> open radial (root or specific bundle), unless suppressed
+            if (heldNow && !openHeldPrev && !suppressUntilRelease) {
+                if (bundleIdDown != null) {
+                    Constants.LOG.debug("[{}] Radial bundle hotkey pressed; opening at bundle '{}'.",
+                            Constants.MOD_NAME, bundleIdDown);
+                    RadialMenu.openAtBundle(bundleIdDown);
+                } else {
+                    Constants.LOG.debug("[{}] Radial hotkey pressed; opening at root.", Constants.MOD_NAME);
+                    RadialMenu.open();
+                }
+            }
+
+            // Falling edge -> notify screen + cleanup + clear suppression
             if (!heldNow && openHeldPrev) {
                 if (mc.screen instanceof RadialMenuScreen s) {
                     s.onHotkeyReleased();

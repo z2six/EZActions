@@ -1,8 +1,10 @@
 // MainFile: src/main/java/org/z2six/ezactions/gui/editor/CategoryEditScreen.java
 package org.z2six.ezactions.gui.editor;
 
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Checkbox;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -18,7 +20,9 @@ import java.util.List;
 /*
  * // MainFile: src/main/java/org/z2six/ezactions/gui/editor/CategoryEditScreen.java
  *
- * Editor for Category (Bundle) items, now with Note support.
+ * Editor for Category (Bundle) items, now with Note support and bundle flags:
+ *  - Hide from main radial
+ *  - Enable keybind (register bundle key on next restart)
  *
  * Field spacing per row:
  *   Label
@@ -50,10 +54,17 @@ public final class CategoryEditScreen extends Screen {
     private String draftTitle = "";
     private String draftNote  = "";
     private IconSpec draftIcon = IconSpec.item("minecraft:stone");
+    private boolean draftHideFromMainRadial = false;
+    private boolean draftEnableKeybind = false;
 
     // Widgets
     private EditBox titleBox;
     private EditBox noteBox;
+    private Checkbox hideFromMainCheckbox;
+    private Checkbox enableKeybindCheckbox;
+
+    // "Applied on next restart" hint (only when toggling Enable keybind)
+    private boolean showRestartHint = false;
 
     public CategoryEditScreen(Screen parent, MenuItem editing) {
         super(Component.literal(editing == null ? "Add Bundle" : "Edit Bundle"));
@@ -64,6 +75,10 @@ public final class CategoryEditScreen extends Screen {
             this.draftTitle = safe(editing.title());
             try { this.draftNote = safe(editing.note()); } catch (Throwable ignored) {}
             if (editing.icon() != null) this.draftIcon = editing.icon();
+            try {
+                this.draftHideFromMainRadial = editing.hideFromMainRadial();
+                this.draftEnableKeybind = editing.bundleKeybindEnabled();
+            } catch (Throwable ignored) {}
         }
     }
 
@@ -90,6 +105,40 @@ public final class CategoryEditScreen extends Screen {
         noteBox.setValue(draftNote);
         noteBox.setResponder(s -> draftNote = safe(s));
         addRenderableWidget(noteBox);
+        y += 20;
+
+        // --- Bundle flags (checkboxes) ---
+        y += 6;
+
+        // Forge 1.20.1 does not have Checkbox.builder(...). Use constructor and hook onPress.
+        hideFromMainCheckbox = new Checkbox(cx - 140, y, 280, 20,
+                Component.literal("Hide from main radial"), draftHideFromMainRadial) {
+            @Override
+            public void onPress() {
+                super.onPress();
+                try {
+                    draftHideFromMainRadial = this.selected();
+                } catch (Throwable ignored) {}
+            }
+        };
+        // Ensure initial draft reflects the widget (in case MC toggled anything internally)
+        try { draftHideFromMainRadial = hideFromMainCheckbox.selected(); } catch (Throwable ignored) {}
+        addRenderableWidget(hideFromMainCheckbox);
+        y += 20 + 4;
+
+        enableKeybindCheckbox = new Checkbox(cx - 140, y, 280, 20,
+                Component.literal("Enable keybind"), draftEnableKeybind) {
+            @Override
+            public void onPress() {
+                super.onPress();
+                try {
+                    draftEnableKeybind = this.selected();
+                    showRestartHint = true; // show red "applied on next restart"
+                } catch (Throwable ignored) {}
+            }
+        };
+        try { draftEnableKeybind = enableKeybindCheckbox.selected(); } catch (Throwable ignored) {}
+        addRenderableWidget(enableKeybindCheckbox);
         y += 20;
 
         // --- Button rows stack ---
@@ -120,8 +169,25 @@ public final class CategoryEditScreen extends Screen {
             draftTitle = safe(titleBox == null ? draftTitle : titleBox.getValue()).trim();
             draftNote  = safe(noteBox  == null ? draftNote  : noteBox.getValue()).trim();
 
+            // Re-sync flags from widgets (in case user didn’t click them after opening)
+            try {
+                if (hideFromMainCheckbox != null) draftHideFromMainRadial = hideFromMainCheckbox.selected();
+                if (enableKeybindCheckbox != null) draftEnableKeybind = enableKeybindCheckbox.selected();
+            } catch (Throwable ignored) {}
+
             if (draftTitle.isEmpty()) {
                 Constants.LOG.warn("[{}] CategoryEdit: Title empty; ignoring save.", Constants.MOD_NAME);
+                return;
+            }
+
+            // Enforce "bundle id == bundle title" uniqueness across categories.
+            String newId = draftTitle;
+            if (RadialMenu.isBundleNameTaken(newId, editing)) {
+                Constants.LOG.warn("[{}] CategoryEdit: Duplicate bundle title/id '{}' detected; save aborted.",
+                        Constants.MOD_NAME, newId);
+                try {
+                    if (titleBox != null) titleBox.setTextColor(0xFFFF5555);
+                } catch (Throwable ignored) {}
                 return;
             }
 
@@ -135,14 +201,19 @@ public final class CategoryEditScreen extends Screen {
                 }
             }
 
-            // NOTE: assumes your MenuItem constructor supports: (id, title, note, icon, action, children)
+            boolean hideFlag = draftHideFromMainRadial;
+            boolean keybindFlag = draftEnableKeybind;
+
+            // NOTE: id == title; bundle hotkeys reference this id by name
             MenuItem newItem = new MenuItem(
-                    editing != null ? editing.id() : MenuEditorScreen.freshId("cat"),
+                    newId,
                     draftTitle,
                     draftNote,
                     draftIcon,
-                    null, // action == null => category
-                    children
+                    null, // action == null => category (bundle)
+                    children,
+                    hideFlag,
+                    keybindFlag
             );
 
             boolean ok = (editing == null)
@@ -188,6 +259,14 @@ public final class CategoryEditScreen extends Screen {
         try {
             IconRenderer.drawIcon(g, bx + boxW / 2, by + boxH / 2 + 6, draftIcon);
         } catch (Throwable ignored) {}
+
+        // Restart hint (only when Enable keybind was toggled)
+        if (showRestartHint && enableKeybindCheckbox != null) {
+            int hx = enableKeybindCheckbox.getX();
+            int hy = enableKeybindCheckbox.getY() + 22;
+            Component msg = Component.literal("Applied on next restart").withStyle(ChatFormatting.RED);
+            g.drawString(this.font, msg.getString(), hx, hy, 0xFFFF5555);
+        }
 
         super.render(g, mouseX, mouseY, partialTick);
     }
