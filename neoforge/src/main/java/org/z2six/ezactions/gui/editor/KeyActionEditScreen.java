@@ -1,3 +1,4 @@
+// src/main/java/org/z2six/ezactions/gui/editor/KeyActionEditScreen.java
 // MainFile: src/main/java/org/z2six/ezactions/gui/editor/KeyActionEditScreen.java
 package org.z2six.ezactions.gui.editor;
 
@@ -54,7 +55,13 @@ public final class KeyActionEditScreen extends Screen {
     // New: text length limits (MC EditBox defaults to 32 if unset)
     private static final int MAX_LEN_TITLE   = 128;
     private static final int MAX_LEN_NOTE    = 512;
-    private static final int MAX_LEN_MAPPING = 512;
+
+    /**
+     * IMPORTANT:
+     * Keep this comfortably above any realistic mod keybind ids.
+     * (Some mods use long translation keys; 2048 is safe and still reasonable.)
+     */
+    private static final int MAX_LEN_MAPPING = 2048;
 
     // Construction
     private final Screen parent;
@@ -124,10 +131,12 @@ public final class KeyActionEditScreen extends Screen {
 
         // Mapping field
         mappingBox = new EditBox(this.font, cx - (FIELD_W / 2), y, FIELD_W, FIELD_H, Component.literal("Mapping Name"));
-        mappingBox.setMaxLength(MAX_LEN_MAPPING); // <-- fix: allow long key mapping ids
+
+        // Set max length BEFORE value, and keep a comfortable ceiling.
+        mappingBox.setMaxLength(MAX_LEN_MAPPING);
         mappingBox.setValue(draftMapping);
         mappingBox.setHint(Component.literal("KeyMapping id (e.g., key.inventory)"));
-        mappingBox.setResponder(s -> draftMapping = safe(s));
+        wireMappingResponder();
         addRenderableWidget(mappingBox);
         y += FIELD_H;
 
@@ -142,9 +151,10 @@ public final class KeyActionEditScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("Pick from Keybinds…"), b -> {
             try {
                 this.minecraft.setScreen(new KeybindPickerScreen(this, mapping -> {
-                    if (mapping != null && !mapping.isEmpty()) {
-                        draftMapping = mapping;
-                        if (mappingBox != null) mappingBox.setValue(mapping);
+                    try {
+                        applyPickedMapping(mapping);
+                    } catch (Throwable t) {
+                        Constants.LOG.warn("[{}] KeyActionEdit: applyPickedMapping failed: {}", Constants.MOD_NAME, t.toString());
                     }
                     this.minecraft.setScreen(this);
                 }));
@@ -192,11 +202,91 @@ public final class KeyActionEditScreen extends Screen {
         // --- end button stack ---
     }
 
+    /**
+     * Responder wiring for mapping field.
+     * Kept as a method so we can temporarily disable responder while setting programmatically.
+     */
+    private void wireMappingResponder() {
+        if (mappingBox == null) return;
+        mappingBox.setResponder(s -> draftMapping = safe(s));
+    }
+
+    /**
+     * Apply mapping selected from KeybindPickerScreen.
+     *
+     * Fixes the historic "default 32 chars" truncation class of bugs by:
+     * - ensuring mappingBox max length is at least the incoming string length before setValue()
+     * - preventing responder re-entrancy from overwriting draftMapping with a truncated value
+     */
+    private void applyPickedMapping(String mapping) {
+        if (mapping == null) return;
+        String m = safe(mapping).trim();
+        if (m.isEmpty()) return;
+
+        // Always keep the full chosen mapping in our draft state.
+        this.draftMapping = m;
+
+        if (mappingBox != null) {
+            try {
+                // Defensive: ensure box max length cannot be the default 32 at this moment.
+                int need = Math.max(MAX_LEN_MAPPING, m.length());
+
+                // Temporarily disable responder so a clamped setValue can't overwrite draftMapping.
+                mappingBox.setResponder(s -> {});
+                mappingBox.setMaxLength(need);
+                mappingBox.setValue(m);
+                wireMappingResponder();
+
+                Constants.LOG.debug("[{}] KeyActionEdit: applied picked mapping (len={}, boxMax>=len={}).",
+                        Constants.MOD_NAME, m.length(), need);
+            } catch (Throwable t) {
+                Constants.LOG.warn("[{}] KeyActionEdit: failed applying picked mapping to box: {}", Constants.MOD_NAME, t.toString());
+                // draftMapping already updated; box may be stale but save will still prefer draftMapping.
+                try { wireMappingResponder(); } catch (Throwable ignored) {}
+            }
+        }
+    }
+
+    private static String chooseBestMapping(String fromBox, String fromDraft) {
+        String a = safe(fromBox).trim();
+        String b = safe(fromDraft).trim();
+
+        if (a.isEmpty() && b.isEmpty()) return "";
+        if (a.isEmpty()) return b;
+        if (b.isEmpty()) return a;
+
+        if (a.equals(b)) return a;
+
+        // Prefer the longer one; this fixes "picker value got clamped in the EditBox".
+        if (b.length() > a.length()) return b;
+        if (a.length() > b.length()) return a;
+
+        // Same length but different; prefer box (latest user-visible value).
+        return a;
+    }
+
     private void onSavePressed() {
         try {
             draftTitle   = safe(titleBox == null ? draftTitle : titleBox.getValue()).trim();
             draftNote    = safe(noteBox  == null ? draftNote  : noteBox.getValue()).trim();
-            draftMapping = safe(mappingBox == null ? draftMapping : mappingBox.getValue()).trim();
+
+            String boxMapping = safe(mappingBox == null ? "" : mappingBox.getValue());
+            String chosenMapping = chooseBestMapping(boxMapping, draftMapping);
+
+            // If we detect mismatch, log it to help future diagnostics.
+            if (!safe(boxMapping).trim().equals(safe(draftMapping).trim())) {
+                Constants.LOG.debug("[{}] KeyActionEdit: mapping mismatch on save (boxLen={}, draftLen={}, chosenLen={}). box='{}' draft='{}'.",
+                        Constants.MOD_NAME,
+                        safe(boxMapping).trim().length(),
+                        safe(draftMapping).trim().length(),
+                        chosenMapping.length(),
+                        safe(boxMapping).trim(),
+                        safe(draftMapping).trim()
+                );
+            }
+
+            draftMapping = chosenMapping;
+
             draftMode = modeCycle == null ? draftMode : modeCycle.getValue();
             draftToggle = toggleCycle != null && Boolean.TRUE.equals(toggleCycle.getValue());
 
@@ -256,6 +346,28 @@ public final class KeyActionEditScreen extends Screen {
         // Icon preview (top-right)
         try {
             IconRenderer.drawIcon(g, this.width - 28, 28, this.draftIcon);
+        } catch (Throwable ignored) {}
+
+        // Tooltip for long mapping names so they don't LOOK "trimmed" in the UI.
+        // This does not change stored values; it only improves visibility.
+        try {
+            if (mappingBox != null) {
+                int bx = mappingBox.getX();
+                int by = mappingBox.getY();
+                int bw = mappingBox.getWidth();
+                int bh = mappingBox.getHeight();
+                boolean over = mouseX >= bx && mouseX < bx + bw && mouseY >= by && mouseY < by + bh;
+                if (over) {
+                    String val = safe(mappingBox.getValue()).trim();
+                    if (!val.isEmpty()) {
+                        int textW = this.font.width(val);
+                        int visibleW = Math.max(1, bw - 8);
+                        if (textW > visibleW) {
+                            g.renderTooltip(this.font, Component.literal(val), mouseX, mouseY);
+                        }
+                    }
+                }
+            }
         } catch (Throwable ignored) {}
 
         super.render(g, mouseX, mouseY, partialTick);
