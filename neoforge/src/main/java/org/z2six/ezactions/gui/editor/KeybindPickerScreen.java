@@ -22,7 +22,7 @@ import java.util.function.Consumer;
  *
  * Added:
  * - Click-and-drag scrollbar knob.
- * - Robust math for knob <-> scrollY mapping.
+ * - Robust math for knob to/from scrollY mapping.
  * - Debug logs for layout/drag diagnostics.
  * - Filter box: filters by mapping id, localized label ("flavor text"), and mod/category text.
  * - Results stay grouped by mod (header per mod), not a flat list.
