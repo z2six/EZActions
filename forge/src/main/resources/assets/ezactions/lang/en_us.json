@@ -1,5 +1,6 @@
 {
   "key.categories.ezactions": "EZ Actions",
   "key.ezactions.open": "Open radial menu",
-  "key.ezactions.open_editor": "Open editor"
+  "key.ezactions.open_editor": "Open editor",
+  "key.categories.ezactions.bundles": "EZ Actions: bundles"
 }
