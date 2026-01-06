@@ -1,4 +1,4 @@
-// MainFile: src/main/java/org/z2six/ezactions/config/RadialConfig.java
+// MainFile: forge/src/main/java/org/z2six/ezactions/config/RadialConfig.java
 package org.z2six.ezactions.config;
 
 import com.electronwill.nightconfig.core.Config;
@@ -12,12 +12,20 @@ import org.z2six.ezactions.Constants;
 
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 
-//* Separate config for radial look & feel. Now prefers ModConfigSpec (Configured-visible). **/
+/**
+ * Separate config for radial look & feel.
+ *
+ * IMPORTANT:
+ * - Cached singleton caused stale values after ConfigScreen save.
+ * - We add invalidate() and make INSTANCE volatile (same idea as NeoForge fix).
+ */
 public final class RadialConfig {
     private static final Gson G = new GsonBuilder().setPrettyPrinting().create();
-    private static RadialConfig INSTANCE;
+    private static volatile RadialConfig INSTANCE;
 
     // Defaults
     public int deadzone = 18;
@@ -34,13 +42,21 @@ public final class RadialConfig {
     private RadialConfig() {}
 
     public static RadialConfig get() {
-        if (INSTANCE == null) {
-            INSTANCE = loadPreferringSpec();
+        RadialConfig inst = INSTANCE;
+        if (inst == null) {
+            inst = loadPreferringSpec();
+            INSTANCE = inst;
         }
-        return INSTANCE;
+        return inst;
     }
 
-    // Prefer ModConfigSpec values
+    public static void invalidate() {
+        try {
+            Constants.LOG.debug("[{}] RadialConfig.invalidate()", Constants.MOD_NAME);
+        } catch (Throwable ignored) {}
+        INSTANCE = null;
+    }
+
     private static RadialConfig loadPreferringSpec() {
         try {
             if (DesignClientConfig.SPEC != null) {
@@ -50,18 +66,18 @@ public final class RadialConfig {
                 c.ringThickness       = DesignClientConfig.ringThickness.get();
                 c.scaleStartThreshold = DesignClientConfig.scaleStartThreshold.get();
                 c.scalePerItem        = DesignClientConfig.scalePerItem.get();
-                // CHANGED: read ints directly
                 c.ringColor           = DesignClientConfig.ringColor.get();
                 c.hoverColor          = DesignClientConfig.hoverColor.get();
                 return c;
             }
         } catch (Throwable t) {
-            Constants.LOG.debug("[{}] Spec not ready, falling back to file: {}", Constants.MOD_NAME, t.toString());
+            try {
+                Constants.LOG.debug("[{}] RadialConfig spec read failed; falling back to file: {}", Constants.MOD_NAME, t.toString());
+            } catch (Throwable ignored) {}
         }
         return loadOrCreateFromFile();
     }
 
-    // File-based fallback (unchanged except colors now read as number OR string)
     private static RadialConfig loadOrCreateFromFile() {
         Path toml = tomlFile();
         Path legacy = legacyFile();
@@ -79,7 +95,9 @@ public final class RadialConfig {
                 c.hoverColor          = getColor(cfg, "hoverColor",        c.hoverColor);
                 return c;
             } catch (Throwable t) {
-                Constants.LOG.warn("[{}] Failed to load {}: {} (writing defaults)", Constants.MOD_NAME, toml, t.toString());
+                try {
+                    Constants.LOG.warn("[{}] Failed to load {}: {} (writing defaults)", Constants.MOD_NAME, toml, t.toString());
+                } catch (Throwable ignored) {}
                 RadialConfig c = new RadialConfig();
                 save(c);
                 return c;
@@ -104,7 +122,9 @@ public final class RadialConfig {
                 catch (Throwable ignore) {}
                 return c;
             } catch (Throwable t) {
-                Constants.LOG.warn("[{}] Failed to migrate {}: {}", Constants.MOD_NAME, legacy, t.toString());
+                try {
+                    Constants.LOG.warn("[{}] Failed to migrate {}: {}", Constants.MOD_NAME, legacy, t.toString());
+                } catch (Throwable ignored) {}
                 RadialConfig c = new RadialConfig();
                 save(c);
                 return c;
@@ -127,10 +147,12 @@ public final class RadialConfig {
                 DesignClientConfig.scalePerItem.set(c.scalePerItem);
                 DesignClientConfig.ringColor.set(c.ringColor);
                 DesignClientConfig.hoverColor.set(c.hoverColor);
-                return; // NeoForge persists
+                return;
             }
         } catch (Throwable t) {
-            Constants.LOG.debug("[{}] Could not write DesignClientConfig; falling back to file: {}", Constants.MOD_NAME, t.toString());
+            try {
+                Constants.LOG.debug("[{}] Could not write DesignClientConfig; falling back to file: {}", Constants.MOD_NAME, t.toString());
+            } catch (Throwable ignored) {}
         }
 
         // Fallback to file writer
@@ -153,11 +175,12 @@ public final class RadialConfig {
                 cfg.save();
             }
         } catch (Throwable e) {
-            Constants.LOG.warn("[{}] Failed to save {}: {}", Constants.MOD_NAME, f, e.toString());
+            try {
+                Constants.LOG.warn("[{}] Failed to save {}: {}", Constants.MOD_NAME, f, e.toString());
+            } catch (Throwable ignored) {}
         }
     }
 
-    // helpers
     private static Path tomlFile() {
         try {
             Path game = Minecraft.getInstance().gameDirectory.toPath();
@@ -166,6 +189,7 @@ public final class RadialConfig {
             return Path.of("config", Constants.MOD_ID, NEW_FILE);
         }
     }
+
     private static Path legacyFile() {
         try {
             Path game = Minecraft.getInstance().gameDirectory.toPath();
@@ -174,6 +198,7 @@ public final class RadialConfig {
             return Path.of("config", Constants.MOD_ID, LEGACY_JSON);
         }
     }
+
     private static int getInt(CommentedFileConfig cfg, String key, int dflt) {
         try {
             Object v = cfg.get(key);
@@ -182,6 +207,7 @@ public final class RadialConfig {
         } catch (Throwable ignored) {}
         return dflt;
     }
+
     private static int getColor(CommentedFileConfig cfg, String key, int dflt) {
         try {
             Object v = cfg.get(key);
@@ -190,6 +216,7 @@ public final class RadialConfig {
         } catch (Throwable ignored) {}
         return dflt;
     }
+
     private static int parseColor(String s, int fallback) {
         try {
             String t = s == null ? "" : s.trim();
@@ -200,10 +227,13 @@ public final class RadialConfig {
             long val = Long.parseUnsignedLong(t, 16);
             return (int) val;
         } catch (Throwable e) {
-            Constants.LOG.warn("[{}] Bad color literal '{}'; using fallback 0x{}", Constants.MOD_NAME, s, Integer.toHexString(fallback));
+            try {
+                Constants.LOG.warn("[{}] Bad color literal '{}'; using fallback 0x{}", Constants.MOD_NAME, s, Integer.toHexString(fallback));
+            } catch (Throwable ignored) {}
             return fallback;
         }
     }
+
     private static int safeInt(com.google.gson.JsonElement el, int dflt) {
         try { return el.getAsInt(); } catch (Throwable ignored) { return dflt; }
     }
