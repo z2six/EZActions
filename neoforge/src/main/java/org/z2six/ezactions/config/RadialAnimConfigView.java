@@ -1,11 +1,14 @@
-// MainFile: src/main/java/org/z2six/ezactions/config/RadialAnimConfigView.java
+// MainFile: neoforge/src/main/java/org/z2six/ezactions/config/RadialAnimConfigView.java
 package org.z2six.ezactions.config;
 
 import org.z2six.ezactions.Constants;
 
 /**
- * Read-only snapshot of animation settings, backed by the NeoForge TOML spec.
- * Never throws; falls back to sane defaults if the spec isn't available.
+ * Lightweight "view" of RadialAnimConfig for rendering.
+ *
+ * IMPORTANT:
+ * - The old code cached a single INSTANCE with final fields, so config changes never applied.
+ * - This version returns a fresh snapshot each call.
  */
 public final class RadialAnimConfigView {
 
@@ -15,9 +18,9 @@ public final class RadialAnimConfigView {
     public final double  hoverGrowPct;
     public final int     openCloseMs;
 
-    private static final RadialAnimConfigView INSTANCE = new RadialAnimConfigView();
-
-    public static RadialAnimConfigView get() { return INSTANCE; }
+    public static RadialAnimConfigView get() {
+        return new RadialAnimConfigView();
+    }
 
     private RadialAnimConfigView() {
         boolean ae = true, aoc = true, ah = true;
@@ -25,7 +28,6 @@ public final class RadialAnimConfigView {
         int     ocm = 250;
 
         try {
-            // Pull directly from the ModConfigSpec values.
             RadialAnimConfig c = RadialAnimConfig.CONFIG;
             ae  = c.animationsEnabled();
             aoc = c.animOpenClose();

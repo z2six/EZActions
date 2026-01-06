@@ -1,7 +1,8 @@
-// MainFile: src/main/java/org/z2six/ezactions/gui/editor/config/ConfigScreen.java
+// MainFile: neoforge/src/main/java/org/z2six/ezactions/gui/editor/config/ConfigScreen.java
 package org.z2six.ezactions.gui.editor.config;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
@@ -9,43 +10,30 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.z2six.ezactions.Constants;
+import org.z2six.ezactions.config.ConfigIO;
 import org.z2six.ezactions.config.DesignClientConfig;
 import org.z2six.ezactions.config.GeneralClientConfig;
 import org.z2six.ezactions.config.RadialAnimConfig;
+import org.z2six.ezactions.config.RadialConfig;
 
-import static java.lang.Integer.parseInt;
-
-/**
- * In-game config UI (General / Animations / Design) with live previews + color pickers.
- * Saves directly into existing ModConfigSpec values (no crashes; defensive parsing).
- *
- * Changes here implement the right-panel inner margin and ensure the section title
- * sits above all fields (no overlap). Labels render to the RIGHT of each text box.
- */
 public final class ConfigScreen extends Screen {
 
     private final Screen parent;
 
-    // Section toggle
     private enum Section { GENERAL, ANIM, DESIGN }
     private Section section = Section.GENERAL;
 
-    // One-shot flag: when returning from a child screen (e.g., color picker), skip reloading drafts from spec
     private boolean skipReloadDraftsOnce = false;
 
-    // --- Drafts (read from current specs on init) ----------------------------
-    // General
     private boolean draftMoveWhileRadialOpen;
     private int draftCmdVisibleLines;
 
-    // Anim
     private boolean draftAnimEnabled;
     private boolean draftAnimOpenClose;
     private boolean draftAnimHover;
     private double  draftHoverGrowPct;
     private int     draftOpenCloseMs;
 
-    // Design
     private int draftDeadzone;
     private int draftBaseOuterRadius;
     private int draftRingThickness;
@@ -54,19 +42,15 @@ public final class ConfigScreen extends Screen {
     private int draftRingColor;   // ARGB
     private int draftHoverColor;  // ARGB
 
-    // Widgets we need to read from on Save
-    // General
     private CycleButton<Boolean> wMoveWhileOpen;
     private EditBox wCmdLines;
 
-    // Anim
     private CycleButton<Boolean> wAnimEnabled;
     private CycleButton<Boolean> wAnimOpenClose;
     private CycleButton<Boolean> wAnimHover;
     private EditBox wHoverGrowPct;
     private EditBox wOpenCloseMs;
 
-    // Design
     private EditBox wDeadzone, wOuter, wThick, wScaleStart, wScalePer;
     private Button  wRingPick, wHoverPick;
 
@@ -80,25 +64,22 @@ public final class ConfigScreen extends Screen {
         if (!skipReloadDraftsOnce) {
             readCurrentIntoDrafts();
         } else {
-            skipReloadDraftsOnce = false; // consume the one-shot skip
+            skipReloadDraftsOnce = false;
         }
         buildUI();
     }
 
     private void readCurrentIntoDrafts() {
         try {
-            // General
             draftMoveWhileRadialOpen = GeneralClientConfig.CONFIG.moveWhileRadialOpen();
             draftCmdVisibleLines     = GeneralClientConfig.CONFIG.commandEditorVisibleLines();
 
-            // Anim
             draftAnimEnabled    = RadialAnimConfig.CONFIG.animationsEnabled();
             draftAnimOpenClose  = RadialAnimConfig.CONFIG.animOpenClose();
             draftAnimHover      = RadialAnimConfig.CONFIG.animHover();
             draftHoverGrowPct   = RadialAnimConfig.CONFIG.hoverGrowPct();
             draftOpenCloseMs    = RadialAnimConfig.CONFIG.openCloseMs();
 
-            // Design
             draftDeadzone            = DesignClientConfig.deadzone.get();
             draftBaseOuterRadius     = DesignClientConfig.baseOuterRadius.get();
             draftRingThickness       = DesignClientConfig.ringThickness.get();
@@ -119,36 +100,38 @@ public final class ConfigScreen extends Screen {
         final int FIELD_W = 160;
         final int FIELD_H = 20;
 
-        // Right panel inner margins & header spacing (implements the margin suggestion)
-        final int RIGHT_INNER_PAD = 16;   // left inset inside right panel
-        final int HEADER_Y = PAD + 8;     // header baseline inside right panel
-        final int FORM_TOP_GAP = 18;      // gap below header before fields begin
+        final int RIGHT_INNER_PAD = 16;
+        final int HEADER_Y = PAD + 8;
+        final int FORM_TOP_GAP = 18;
 
-        // Left section chooser
         int x = PAD, y = PAD;
+
         addRenderableWidget(Button.builder(Component.literal("General"), b -> {
-            section = Section.GENERAL; buildUI();
+            section = Section.GENERAL;
+            buildUI();
         }).bounds(x, y, LEFT_W, 20).build());
         y += 24;
+
         addRenderableWidget(Button.builder(Component.literal("Animations"), b -> {
-            section = Section.ANIM; buildUI();
+            section = Section.ANIM;
+            buildUI();
         }).bounds(x, y, LEFT_W, 20).build());
         y += 24;
+
         addRenderableWidget(Button.builder(Component.literal("Design"), b -> {
-            section = Section.DESIGN; buildUI();
+            section = Section.DESIGN;
+            buildUI();
         }).bounds(x, y, LEFT_W, 20).build());
 
-        // Bottom buttons (Save / Back) — anchored to bottom of left panel
         int bottom = this.height - PAD;
         addRenderableWidget(Button.builder(Component.literal("Save"), b -> onSave())
                 .bounds(x, bottom - 22, LEFT_W, 20).build());
         addRenderableWidget(Button.builder(Component.literal("Back"), b -> onClose())
                 .bounds(x, bottom - 22 - 24, LEFT_W, 20).build());
 
-        // Right panel form origin (panel bg drawn in render())
         int rightPanelX = PAD + LEFT_W + PAD;
-        int formX = rightPanelX + RIGHT_INNER_PAD;          // inner left margin
-        int formY = HEADER_Y + FORM_TOP_GAP;                // fields start below header
+        int formX = rightPanelX + RIGHT_INNER_PAD;
+        int formY = HEADER_Y + FORM_TOP_GAP;
         int row = 0;
 
         switch (section) {
@@ -202,10 +185,9 @@ public final class ConfigScreen extends Screen {
 
                 int btnY = formY + row * 28;
                 wRingPick = Button.builder(Component.literal("Pick Ring Color…"), b -> {
-                    // Avoid re-reading spec on return so chosen color remains visible
                     this.skipReloadDraftsOnce = true;
                     this.minecraft.setScreen(new ColorPickerScreen(this, draftRingColor, argb -> {
-                        draftRingColor = argb; // draft only; click Save to persist
+                        draftRingColor = argb;
                     }));
                 }).bounds(formX, btnY, FIELD_W, FIELD_H).build();
                 addRenderableWidget(wRingPick);
@@ -214,7 +196,7 @@ public final class ConfigScreen extends Screen {
                 wHoverPick = Button.builder(Component.literal("Pick Hover Color…"), b -> {
                     this.skipReloadDraftsOnce = true;
                     this.minecraft.setScreen(new ColorPickerScreen(this, draftHoverColor, argb -> {
-                        draftHoverColor = argb; // draft only; click Save to persist
+                        draftHoverColor = argb;
                     }));
                 }).bounds(formX, formY + row * 28, FIELD_W, FIELD_H).build();
                 addRenderableWidget(wHoverPick);
@@ -238,6 +220,9 @@ public final class ConfigScreen extends Screen {
 
                     GeneralClientConfig.CONFIG.moveWhileRadialOpen.set(draftMoveWhileRadialOpen);
                     GeneralClientConfig.CONFIG.commandEditorVisibleLines.set(draftCmdVisibleLines);
+
+                    // force-save now
+                    ConfigIO.saveNow(ConfigIO.Section.GENERAL);
                 }
                 case ANIM -> {
                     draftAnimEnabled   = wAnimEnabled != null && Boolean.TRUE.equals(wAnimEnabled.getValue());
@@ -251,6 +236,9 @@ public final class ConfigScreen extends Screen {
                     RadialAnimConfig.CONFIG.animHover.set(draftAnimHover);
                     RadialAnimConfig.CONFIG.hoverGrowPct.set(draftHoverGrowPct);
                     RadialAnimConfig.CONFIG.openCloseMs.set(draftOpenCloseMs);
+
+                    // force-save now
+                    ConfigIO.saveNow(ConfigIO.Section.ANIM);
                 }
                 case DESIGN -> {
                     draftDeadzone            = clamp(parseSafeInt(wDeadzone, 18), 0, 90);
@@ -266,6 +254,12 @@ public final class ConfigScreen extends Screen {
                     DesignClientConfig.scalePerItem.set(draftScalePerItem);
                     DesignClientConfig.ringColor.set(draftRingColor);
                     DesignClientConfig.hoverColor.set(draftHoverColor);
+
+                    // force-save now
+                    ConfigIO.saveNow(ConfigIO.Section.DESIGN);
+
+                    // IMPORTANT: design values are used via RadialConfig.get() cache
+                    RadialConfig.invalidate();
                 }
             }
 
@@ -283,15 +277,11 @@ public final class ConfigScreen extends Screen {
         final int RIGHT_INNER_PAD = 16;
         final int LABEL_COLOR = 0xA0A0A0;
 
-        // Backgrounds
         g.fill(0, 0, width, height, 0x88000000);
-        // Left panel
         g.fill(PAD, PAD, PAD + LEFT_W, this.height - PAD, 0xC0101010);
-        // Right panel
         int rightPanelX = PAD + LEFT_W + PAD;
         g.fill(rightPanelX, PAD, this.width - PAD, this.height - PAD, 0xC0101010);
 
-        // Title & section header
         g.drawCenteredString(this.font, this.title.getString(), this.width / 2, 8, 0xFFFFFF);
 
         String sec = switch (section) {
@@ -299,11 +289,10 @@ public final class ConfigScreen extends Screen {
             case ANIM    -> "Animations";
             case DESIGN  -> "Design";
         };
-        int headerX = rightPanelX + RIGHT_INNER_PAD;  // left margin INSIDE the right panel
-        int headerY = PAD + 8;                        // header baseline
+        int headerX = rightPanelX + RIGHT_INNER_PAD;
+        int headerY = PAD + 8;
         g.drawString(this.font, sec, headerX, headerY, LABEL_COLOR);
 
-        // Draw labels to the RIGHT of each EditBox (per section)
         switch (section) {
             case GENERAL -> {
                 drawRightLabel(g, wCmdLines, "Visible lines (1–20)");
@@ -319,7 +308,6 @@ public final class ConfigScreen extends Screen {
                 drawRightLabel(g, wScaleStart,  "Scale Start");
                 drawRightLabel(g, wScalePer,    "Scale / Item");
 
-                // Color previews to the right of buttons
                 if (wRingPick != null) {
                     int x = wRingPick.getX() + wRingPick.getWidth() + 8;
                     int y = wRingPick.getY();
@@ -338,17 +326,15 @@ public final class ConfigScreen extends Screen {
         super.render(g, mouseX, mouseY, partialTick);
     }
 
-    /** Draws a grey label to the RIGHT of an EditBox, with small vertical padding. */
     private void drawRightLabel(GuiGraphics g, EditBox eb, String label) {
         if (eb == null) return;
         final int GAP = 8;
         int lx = eb.getX() + eb.getWidth() + GAP;
-        int ly = eb.getY() + 4; // align with field text
+        int ly = eb.getY() + 4;
         g.drawString(this.font, label, lx, ly, 0xA0A0A0);
     }
 
     private void drawColorPreview(GuiGraphics g, int x, int y, int argb) {
-        // checker bg 64x18
         int sw = 64, sh = 18, cell = 6;
         for (int yy = 0; yy < sh; yy += cell) {
             for (int xx = 0; xx < sw; xx += cell) {
@@ -364,11 +350,13 @@ public final class ConfigScreen extends Screen {
     }
 
     private static int parseSafeInt(EditBox eb, int dflt) {
-        try { return parseInt(eb.getValue().trim()); } catch (Throwable ignored) { return dflt; }
+        try { return Integer.parseInt(eb.getValue().trim()); } catch (Throwable ignored) { return dflt; }
     }
+
     private static double parseSafeDouble(EditBox eb, double dflt) {
         try { return Double.parseDouble(eb.getValue().trim()); } catch (Throwable ignored) { return dflt; }
     }
+
     private static int clamp(int v, int lo, int hi) { return Math.max(lo, Math.min(hi, v)); }
     private static double clampDouble(double v, double lo, double hi) { return Math.max(lo, Math.min(hi, v)); }
 
