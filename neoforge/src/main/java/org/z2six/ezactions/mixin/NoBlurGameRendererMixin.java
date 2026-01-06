@@ -1,4 +1,4 @@
-// MainFile: src/main/java/org/z2six/ezactions/mixin/NoBlurGameRendererMixin.java
+// MainFile: neoforge/src/main/java/org/z2six/ezactions/mixin/NoBlurGameRendererMixin.java
 package org.z2six.ezactions.mixin;
 
 import net.minecraft.client.Minecraft;
@@ -8,42 +8,44 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.z2six.ezactions.gui.noblur.NoMenuBlurScreen;
 
 /**
- * Cancels the menu blur pass for our screens only.
- * - Lower priority so shader/renderer mods can hook first.
- * - Optional injections (require=0/expect=0) so we never hard-fail if names change.
+ * Disable blur while ANY EZActions GUI is open.
+ *
+ * Policy:
+ * - If the current screen class is in package "org.z2six.ezactions.", cancel blur.
+ * - Otherwise do nothing (vanilla + other mods blur work normally).
+ *
+ * No logging; fail-safe (never crash render loop).
  */
-@Mixin(value = GameRenderer.class, priority = 100) // default is 1000; lower number = applied later
+@Mixin(value = GameRenderer.class, priority = 100) // lower number = applied later than default 1000
 public abstract class NoBlurGameRendererMixin {
-    /*
-    // Mapping 1: present on some 1.21.1 mappings
+
     @Inject(method = "processBlurEffect", at = @At("HEAD"), cancellable = true, require = 0, expect = 0)
-    private void ezactions$skipMenuBlur$process(float delta, CallbackInfo ci) {
-        cancelIfOurScreen(ci);
+    private void ezactions$skipBlur_process(float delta, CallbackInfo ci) {
+        cancelIfEzActionsScreen(ci);
     }
 
-    // Mapping 2: present on other mapping sets / forks
     @Inject(method = "renderBlur", at = @At("HEAD"), cancellable = true, require = 0, expect = 0)
-    private void ezactions$skipMenuBlur$render(float delta, CallbackInfo ci) {
-        cancelIfOurScreen(ci);
+    private void ezactions$skipBlur_render(float delta, CallbackInfo ci) {
+        cancelIfEzActionsScreen(ci);
     }
 
-    private static void cancelIfOurScreen(CallbackInfo ci) {
-        Screen s = Minecraft.getInstance().screen;
-        if (s == null) return;
+    private static void cancelIfEzActionsScreen(CallbackInfo ci) {
+        try {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc == null) return;
 
-        if (s instanceof NoMenuBlurScreen) {
-            ci.cancel();
-            return;
-        }
-        // Safety: any of our screens, in case someone forgets the marker interface
-        String cn = s.getClass().getName();
-        if (cn != null && cn.startsWith("org.z2six.ezactions.")) {
-            ci.cancel();
+            Screen s = mc.screen;
+            if (s == null) return;
+
+            // Disable blur for any of our GUI screens.
+            String cn = s.getClass().getName();
+            if (cn != null && cn.startsWith("org.z2six.ezactions.")) {
+                ci.cancel();
+            }
+        } catch (Throwable ignored) {
+            // Intentionally swallow: render loop must never crash due to our mixin.
         }
     }
-
-     */
 }

@@ -6,10 +6,11 @@
   "mixins": [],
   "client": [
     "NoBlurGameRendererMixin",
-    "KeyboardHandlerAccessor"
+    "KeyboardHandlerAccessor",
+    "NoCrosshairWhileRadialMixin"
   ],
   "server": [],
   "injectors": {
-    "defaultRequire": 1
+    "defaultRequire": 0
   }
 }
