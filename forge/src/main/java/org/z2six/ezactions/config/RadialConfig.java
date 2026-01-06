@@ -17,7 +17,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
 /**
- * Separate config for radial look & feel.
+ * Separate config for radial look and feel.
  *
  * IMPORTANT:
  * - Cached singleton caused stale values after ConfigScreen save.
