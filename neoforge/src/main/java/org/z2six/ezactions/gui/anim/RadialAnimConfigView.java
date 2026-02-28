@@ -34,10 +34,10 @@ public final class RadialAnimConfigView {
     public static int hoverWipeMs() { return 160; }
 
     /** Hover overlay color (ARGB). */
-    public static int hoverColor() { return 0xFFCC3344; }
+    public static int hoverColor() { return 0xFFFC0553; }
 
     /** Fallback tint color when animations are disabled (ARGB). */
-    public static int instantHoverColor() { return 0xFFCC3344; }
+    public static int instantHoverColor() { return 0xFFFC0553; }
 
     /** Optional small angle hysteresis to reduce boundary flicker (degrees). */
     public static double hoverHysteresisDeg() { return 0.0; }

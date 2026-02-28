@@ -4,6 +4,8 @@ package org.z2six.ezactions.util;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
+import net.neoforged.neoforge.client.settings.KeyConflictContext;
+import net.neoforged.neoforge.client.settings.KeyModifier;
 import org.lwjgl.glfw.GLFW;
 import org.z2six.ezactions.Constants;
 
@@ -26,6 +28,9 @@ public final class EZActionsKeybinds {
         try {
             OPEN_MENU = new KeyMapping(
                     "key.ezactions.open",
+                    KeyConflictContext.IN_GAME,
+                    KeyModifier.NONE,
+                    InputConstants.Type.KEYSYM,
                     GLFW.GLFW_KEY_GRAVE_ACCENT, // default: backtick
                     "key.categories.ezactions"
             );
@@ -33,6 +38,9 @@ public final class EZActionsKeybinds {
 
             OPEN_EDITOR = new KeyMapping(
                     "key.ezactions.open_editor",
+                    KeyConflictContext.IN_GAME,
+                    KeyModifier.NONE,
+                    InputConstants.Type.KEYSYM,
                     InputConstants.UNKNOWN.getValue(), // default: unbound
                     "key.categories.ezactions"
             );

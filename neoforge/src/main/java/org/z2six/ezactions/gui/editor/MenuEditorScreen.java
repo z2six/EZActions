@@ -30,7 +30,7 @@ import java.util.Objects;
  * - Left: action buttons (add key/command/category, edit, remove)
  * - Right: list of items. Categories show as "(RMB to open) Name". RMB enters category; LMB selects/drag.
  * - When inside a category, a white breadcrumb row appears above red "Back to root" and (optional) red "Back to XYZ" rows.
- * - Drag &amp; drop to reorder, with a blue insertion indicator line.
+ * - Drag &amp; drop to reorder, with an accent insertion indicator line.
  * - Drop over a category: highlight it and drop INTO that category.
  * - Drop over "Back to root"/"Back to XYZ": move OUT to that level WITHOUT changing the user's current view.
  * - Scrollbar &amp; mouse wheel supported.
@@ -50,15 +50,15 @@ public final class MenuEditorScreen extends Screen {
     private static final int ICON_SZ = 18;
 
     // Drag visuals
-    private static final int BLUE = 0x802478FF;
-    private static final int BLUE_FULL = 0xFF2478FF; // outlines
-    private static final int HILITE = 0x202478FF;
+    private static final int ACCENT_LINE = 0x80FC0553;
+    private static final int ACCENT_FULL = 0xFFFC0553; // outlines
+    private static final int HILITE = 0x20FC0553;
     private static final int ROW_BG = 0x20FFFFFF;
 
     // Scrollbar visuals
     private static final int SB_W = 6;
-    private static final int SB_BG = 0x40000000;
-    private static final int SB_KNOB = 0x80FFFFFF;
+    private static final int SB_BG = 0x66101010;
+    private static final int SB_KNOB = 0xFFFC0553;
     private static final int SB_KNOB_MINH = 20;
 
     // Bookmark symbol (unicode). If the glyph isn't present, it will render as tofu but still occupy width.
@@ -405,8 +405,8 @@ public final class MenuEditorScreen extends Screen {
         final int HALF_W = (LEFT_W - H_GAP) / 2;
 
         // Labels with simple Unicode arrows; tinted so they stand out
-        Component importLabel = Component.translatable("ezactions.gui.menu_editor.import").withStyle(ChatFormatting.AQUA);
-        Component exportLabel = Component.translatable("ezactions.gui.menu_editor.export").withStyle(ChatFormatting.AQUA);
+        Component importLabel = Component.translatable("ezactions.gui.menu_editor.import").withColor(0xFC0553);
+        Component exportLabel = Component.translatable("ezactions.gui.menu_editor.export").withColor(0xFC0553);
 
         // Bottom row (nearest to bottom): Close | Config
         int yRowBottom = bottom - 22;
@@ -695,7 +695,7 @@ public final class MenuEditorScreen extends Screen {
                 drawBlueOutline(g, listLeft, y, listLeft + listWidth, y + ROW_H);
             } else if (dropAt >= 0) {
                 int yLine = listTop + (dropAt * ROW_H) - (int) scrollY;
-                g.fill(listLeft, yLine - 1, listLeft + listWidth, yLine + 1, BLUE);
+                g.fill(listLeft, yLine - 1, listLeft + listWidth, yLine + 1, ACCENT_LINE);
             }
         }
 
@@ -712,10 +712,10 @@ public final class MenuEditorScreen extends Screen {
 
     private void drawBlueOutline(GuiGraphics g, int x1, int y1, int x2, int y2) {
         final int s = 2;
-        g.fill(x1, y1, x2, y1 + s, BLUE_FULL);
-        g.fill(x1, y2 - s, x2, y2, BLUE_FULL);
-        g.fill(x1, y1, x1 + s, y2, BLUE_FULL);
-        g.fill(x2 - s, y1, x2, y2, BLUE_FULL);
+        g.fill(x1, y1, x2, y1 + s, ACCENT_FULL);
+        g.fill(x1, y2 - s, x2, y2, ACCENT_FULL);
+        g.fill(x1, y1, x1 + s, y2, ACCENT_FULL);
+        g.fill(x2 - s, y1, x2, y2, ACCENT_FULL);
     }
 
     // --- Mouse interaction ---------------------------------------------------

@@ -33,7 +33,7 @@ public final class RadialConfig {
     public int scaleStartThreshold = 8;
     public int scalePerItem = 6;
     public int ringColor = 0xAA000000;  // ARGB
-    public int hoverColor = 0xFFF20044; // ARGB
+    public int hoverColor = 0xFFFC0553; // ARGB
     public int borderColor = 0x66FFFFFF;
     public int textColor = 0xFFFFFFFF;
     public int sliceGapDeg = 0;

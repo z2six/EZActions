@@ -302,7 +302,7 @@ public final class KeybindPickerScreen extends Screen implements NoMenuBlurScree
 
             if (r.header) {
                 g.drawString(this.font, r.label, x, ry + 4, 0xFFFFAA);
-                g.fill(x, ry + ROW_H - 2, x + usableW, ry + ROW_H - 1, 0x40FFFFFF);
+                g.fill(x, ry + ROW_H - 2, x + usableW, ry + ROW_H - 1, 0x50FC0553);
             } else {
                 g.drawString(this.font, r.label, x, ry + 5, 0xFFFFFF);
 
@@ -311,7 +311,7 @@ public final class KeybindPickerScreen extends Screen implements NoMenuBlurScree
                 int btnW = BUTTON_W;
                 int btnH = ROW_H - 6;
 
-                g.fill(btnX, btnY, btnX + btnW, btnY + btnH, 0x40000000);
+                g.fill(btnX, btnY, btnX + btnW, btnY + btnH, 0xD0101010);
                 Component b = Component.translatable("ezactions.gui.keybind_picker.use");
                 int tw = this.font.width(b);
                 g.drawString(this.font, b, btnX + (btnW - tw) / 2, btnY + 5, 0xFFFFFF);
@@ -356,9 +356,9 @@ public final class KeybindPickerScreen extends Screen implements NoMenuBlurScree
 
         ScrollbarMetrics m = computeScrollbarMetrics(content, view);
         // Track
-        g.fill(m.barX, m.barY, m.barX + m.barW, m.barY + m.barH, 0x40000000);
+        g.fill(m.barX, m.barY, m.barX + m.barW, m.barY + m.barH, 0x66101010);
         // Knob
-        g.fill(m.barX + 1, m.knobY, m.barX + m.barW - 1, m.knobY + m.knobH, 0x80FFFFFF);
+        g.fill(m.barX + 1, m.knobY, m.barX + m.barW - 1, m.knobY + m.knobH, 0xFFFC0553);
     }
 
     private static final class ScrollbarMetrics {

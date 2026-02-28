@@ -58,8 +58,8 @@ public final class RadialPreviewScreen extends Screen implements NoMenuBlurScree
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        g.fill(0, 0, this.width, this.height, 0xCC050A10);
-        g.drawCenteredString(this.font, Component.translatable("ezactions.gui.radial_preview.loops"), this.width / 2, 8, 0xD8E9FF);
+        g.fill(0, 0, this.width, this.height, 0xCC000000);
+        g.drawCenteredString(this.font, Component.translatable("ezactions.gui.radial_preview.loops"), this.width / 2, 8, 0xFFEDEDED);
 
         long now = System.currentTimeMillis();
         int animMs = Math.max(150, style == null || style.openCloseMs == null ? 250 : style.openCloseMs);

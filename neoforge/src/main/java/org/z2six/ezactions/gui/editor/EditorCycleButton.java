@@ -105,19 +105,42 @@ public final class EditorCycleButton<T> extends AbstractButton {
         int h = getHeight();
         boolean hovered = isHoveredOrFocused();
 
-        int border = !active ? 0x6640556D : 0xAA2C425B;
-        int bgTop = !active ? 0x66333F4C : (hovered ? 0xF429435F : 0xE61B2D42);
-        int bgBottom = !active ? 0x66303B47 : (hovered ? 0xF422394F : 0xE6152537);
-        int txt = !active ? 0x8896A9BE : (hovered ? 0xFFF4FAFF : 0xFFE2EDF9);
-        int topAccent = !active ? 0x406E7C8C : (hovered ? 0xFF66B5FF : 0x50FFFFFF);
+        int border = !active ? 0x66444444 : 0xAA3A3A3A;
+        int bgTop = !active ? 0x66222222 : (hovered ? 0xFF1E1E1E : 0xF0141414);
+        int bgBottom = !active ? 0x661A1A1A : (hovered ? 0xFF181818 : 0xF0101010);
+        int txt = !active ? 0x88969696 : (hovered ? 0xFFF7F7F7 : 0xFFE4E4E4);
+        int cornerAccent = (!active || !hovered) ? 0xFF000000 : ActionEditorUi.ACCENT;
 
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, border);
         g.fillGradient(x, y, x + w, y + h, bgTop, bgBottom);
-        g.fill(x + 1, y + 1, x + w - 1, y + 2, topAccent);
+        drawInnerCorners(g, x, y, w, h, cornerAccent);
 
         Font font = Minecraft.getInstance().font;
         int ty = y + (h - font.lineHeight) / 2;
         g.drawCenteredString(font, getMessage(), x + (w / 2), ty, txt);
+    }
+
+    private static void drawInnerCorners(GuiGraphics g, int x, int y, int w, int h, int color) {
+        int in = 2;
+        int len = 4;
+
+        int lx = x + in;
+        int rx = x + w - 1 - in;
+        int ty = y + in;
+        int by = y + h - 1 - in;
+
+        // top-left
+        g.fill(lx, ty, lx + 1, ty + len, color);
+        g.fill(lx, ty, lx + len, ty + 1, color);
+        // top-right
+        g.fill(rx, ty, rx + 1, ty + len, color);
+        g.fill(rx - len + 1, ty, rx + 1, ty + 1, color);
+        // bottom-left
+        g.fill(lx, by - len + 1, lx + 1, by + 1, color);
+        g.fill(lx, by, lx + len, by + 1, color);
+        // bottom-right
+        g.fill(rx, by - len + 1, rx + 1, by + 1, color);
+        g.fill(rx - len + 1, by, rx + 1, by + 1, color);
     }
 
     @Override

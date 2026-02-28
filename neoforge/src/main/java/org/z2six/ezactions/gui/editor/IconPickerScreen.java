@@ -16,6 +16,7 @@ import org.z2six.ezactions.data.icon.IconSpec;
 import org.z2six.ezactions.gui.IconRenderer;
 import org.z2six.ezactions.gui.noblur.NoMenuBlurScreen;
 import org.z2six.ezactions.util.CustomIconManager;
+import org.z2six.ezactions.util.PinyinSearchUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,11 +26,13 @@ import java.util.function.Consumer;
 /** Scrollable icon grid (vanilla items + custom 16x16 PNG icons). */
 public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
 
-    private record PickEntry(IconSpec icon, String id, String searchText, Item itemForName, boolean custom) {}
+    private record PickEntry(IconSpec icon, String id, String searchText, String displayName, boolean custom) {}
 
     private final Screen parent;
     private final Consumer<IconSpec> onPick;
+    private static volatile List<PickEntry> CACHED_VANILLA = null;
     private final List<PickEntry> allIcons = new ArrayList<>();
+    private final List<PickEntry> filteredIcons = new ArrayList<>();
     private String filter = "";
     private double scrollY = 0;
     private EditBox filterBox;
@@ -60,6 +63,7 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
             filterBox.setHint(Component.translatable("ezactions.gui.icon_picker.hint.filter"));
             filterBox.setResponder(s -> {
                 filter = s;
+                updateFiltered();
                 double content = contentHeight();
                 double view = viewHeight();
                 scrollY = clamp(scrollY, 0, Math.max(0, content - view));
@@ -72,24 +76,18 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
             CustomIconManager.reload();
             for (String id : CustomIconManager.listIds()) {
                 String search = (id + " custom icon").toLowerCase(Locale.ROOT);
-                allIcons.add(new PickEntry(IconSpec.custom(id), id, search, Items.PAINTING, true));
+                allIcons.add(new PickEntry(IconSpec.custom(id), id, search, id, true));
             }
 
-            // Vanilla item icons.
-            for (var e : BuiltInRegistries.ITEM.entrySet()) {
-                ResourceLocation rl = e.getKey().location();
-                String id = rl.getNamespace() + ":" + rl.getPath();
-                Item item = e.getValue();
-                String name = safeName(item);
-                String search = (id + " " + name + " item").toLowerCase(Locale.ROOT);
-                allIcons.add(new PickEntry(IconSpec.item(id), id, search, item, false));
-            }
+            // Vanilla item icons (cached once per session).
+            allIcons.addAll(cachedVanillaEntries());
 
             allIcons.sort((a, b) -> {
                 if (a.custom != b.custom) return a.custom ? -1 : 1;
                 return a.id.compareToIgnoreCase(b.id);
             });
 
+            updateFiltered();
             scrollY = clamp(scrollY, 0, Math.max(0, contentHeight() - viewHeight()));
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] IconPicker init failed: {}", Constants.MOD_NAME, t.toString());
@@ -119,23 +117,12 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
         if (!inIconArea(mx, my)) {
             return super.mouseClicked(mx, my, button);
         }
-
-        int cols = iconCols();
-        int x0 = iconAreaLeft();
-        int y0 = (int) (iconAreaTop() - scrollY);
-
-        List<PickEntry> filtered = filtered();
-        for (int i = 0; i < filtered.size(); i++) {
-            int col = i % cols;
-            int row = i / cols;
-            int cx = x0 + col * (CELL + GAP);
-            int cy = y0 + row * (CELL + GAP);
-            if (mx >= cx && mx <= cx + CELL && my >= cy && my <= cy + CELL) {
-                try { onPick.accept(filtered.get(i).icon); }
-                catch (Throwable t) { Constants.LOG.warn("[{}] Icon onPick failed: {}", Constants.MOD_NAME, t.toString()); }
-                onClose();
-                return true;
-            }
+        int idx = iconIndexAt(mx, my);
+        if (idx >= 0 && idx < filteredIcons.size()) {
+            try { onPick.accept(filteredIcons.get(idx).icon); }
+            catch (Throwable t) { Constants.LOG.warn("[{}] Icon onPick failed: {}", Constants.MOD_NAME, t.toString()); }
+            onClose();
+            return true;
         }
         return super.mouseClicked(mx, my, button);
     }
@@ -166,26 +153,33 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
         int gridTop = gridTop();
         int gridRight = gridRight();
         int gridBottom = gridBottom();
-        g.fill(gridLeft - 1, gridTop - 1, gridRight + 1, gridBottom + 1, 0x6E3A506A);
-        g.fill(gridLeft, gridTop, gridRight, gridBottom, 0xD6162231);
+        g.fill(gridLeft - 1, gridTop - 1, gridRight + 1, gridBottom + 1, 0x6E2B2B2B);
+        g.fill(gridLeft, gridTop, gridRight, gridBottom, 0xD6101010);
 
         int cols = iconCols();
         int x0 = iconAreaLeft();
         int y0 = (int) (iconAreaTop() - scrollY);
 
-        List<PickEntry> filtered = filtered();
         PickEntry hovered = null;
+        int cellSpan = CELL + GAP;
+        int total = filteredIcons.size();
+        int totalRows = total <= 0 ? 0 : (int) Math.ceil(total / (double) cols);
+        int firstRow = Math.max(0, (int) Math.floor(scrollY / cellSpan));
+        int lastRow = Math.min(totalRows - 1, (int) Math.floor((scrollY + viewHeight()) / cellSpan) + 1);
 
         g.enableScissor(gridLeft, gridTop, gridRight, gridBottom);
         try {
-            for (int i = 0; i < filtered.size(); i++) {
-                int col = i % cols;
-                int row = i / cols;
-                int cx = x0 + col * (CELL + GAP);
-                int cy = y0 + row * (CELL + GAP);
-                IconRenderer.drawIcon(g, cx + CELL / 2, cy + CELL / 2, filtered.get(i).icon);
-                if (mouseX >= cx && mouseX <= cx + CELL && mouseY >= cy && mouseY <= cy + CELL) {
-                    hovered = filtered.get(i);
+            for (int row = firstRow; row <= lastRow; row++) {
+                for (int col = 0; col < cols; col++) {
+                    int i = row * cols + col;
+                    if (i < 0 || i >= total) continue;
+
+                    int cx = x0 + col * cellSpan;
+                    int cy = y0 + row * cellSpan;
+                    IconRenderer.drawIcon(g, cx + CELL / 2, cy + CELL / 2, filteredIcons.get(i).icon);
+                    if (mouseX >= cx && mouseX <= cx + CELL && mouseY >= cy && mouseY <= cy + CELL) {
+                        hovered = filteredIcons.get(i);
+                    }
                 }
             }
         } finally {
@@ -201,8 +195,7 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
             if (hovered.custom) {
                 g.renderTooltip(this.font, Component.translatable("ezactions.gui.icon_picker.tooltip.custom", hovered.id), mouseX, mouseY);
             } else {
-                Component nm = new ItemStack(hovered.itemForName).getHoverName();
-                g.renderTooltip(this.font, Component.translatable("ezactions.gui.icon_picker.tooltip.item", nm, hovered.id), mouseX, mouseY);
+                g.renderTooltip(this.font, Component.translatable("ezactions.gui.icon_picker.tooltip.item", hovered.displayName, hovered.id), mouseX, mouseY);
             }
         }
     }
@@ -217,10 +210,18 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
         catch (Throwable ignored) { return ""; }
     }
 
-    private List<PickEntry> filtered() {
-        if (filter == null || filter.isBlank()) return allIcons;
+    private void updateFiltered() {
+        filteredIcons.clear();
+        if (filter == null || filter.isBlank()) {
+            filteredIcons.addAll(allIcons);
+            return;
+        }
         String f = filter.toLowerCase(Locale.ROOT);
-        return allIcons.stream().filter(s -> s.searchText.contains(f)).toList();
+        for (PickEntry entry : allIcons) {
+            if (entry.searchText.contains(f)) {
+                filteredIcons.add(entry);
+            }
+        }
     }
 
     private int gridLeft() { return PADDING; }
@@ -246,7 +247,7 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
 
     private double contentHeight() {
         int cols = iconCols();
-        int rows = (int) Math.ceil(filtered().size() / (double) cols);
+        int rows = (int) Math.ceil(filteredIcons.size() / (double) cols);
         return rows * (CELL + GAP);
     }
 
@@ -279,8 +280,8 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
         if (content <= view) return;
 
         ScrollbarMetrics m = computeScrollbarMetrics(content, view);
-        g.fill(m.barX, m.barY, m.barX + m.barW, m.barY + m.barH, 0x40000000);
-        g.fill(m.barX + 1, m.knobY, m.barX + m.barW - 1, m.knobY + m.knobH, 0x80FFFFFF);
+        g.fill(m.barX, m.barY, m.barX + m.barW, m.barY + m.barH, 0x66101010);
+        g.fill(m.barX + 1, m.knobY, m.barX + m.barW - 1, m.knobY + m.knobH, 0xFFFC0553);
     }
 
     private boolean beginScrollbarDragIfHit(double mx, double my) {
@@ -312,5 +313,49 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
         double t = trackRange <= 0 ? 0.0 : (newKnobY - m.barY) / trackRange;
         double maxScroll = Math.max(0, content - view);
         scrollY = clamp(t * maxScroll, 0, maxScroll);
+    }
+
+    private int iconIndexAt(double mx, double my) {
+        if (!inIconArea(mx, my)) return -1;
+
+        int cols = iconCols();
+        int cellSpan = CELL + GAP;
+        int localX = (int) (mx - iconAreaLeft());
+        int localY = (int) (my - iconAreaTop() + scrollY);
+        if (localX < 0 || localY < 0) return -1;
+
+        int col = localX / cellSpan;
+        int row = localY / cellSpan;
+        if (col < 0 || col >= cols || row < 0) return -1;
+
+        // Ignore clicks inside inter-cell gap.
+        if ((localX % cellSpan) > CELL || (localY % cellSpan) > CELL) return -1;
+
+        int idx = row * cols + col;
+        return (idx >= 0 && idx < filteredIcons.size()) ? idx : -1;
+    }
+
+    private static List<PickEntry> cachedVanillaEntries() {
+        List<PickEntry> cache = CACHED_VANILLA;
+        if (cache != null) return cache;
+        synchronized (IconPickerScreen.class) {
+            cache = CACHED_VANILLA;
+            if (cache != null) return cache;
+
+            List<PickEntry> built = new ArrayList<>();
+            for (var e : BuiltInRegistries.ITEM.entrySet()) {
+                ResourceLocation rl = e.getKey().location();
+                String id = rl.getNamespace() + ":" + rl.getPath();
+                Item item = e.getValue();
+                String name = safeName(item);
+                PinyinSearchUtil.Tokens py = PinyinSearchUtil.tokens(name);
+                String search = (id + " " + name + " item "
+                        + py.spaced() + " " + py.compact() + " " + py.initials()).toLowerCase(Locale.ROOT);
+                built.add(new PickEntry(IconSpec.item(id), id, search, name, false));
+            }
+            built.sort((a, b) -> a.id.compareToIgnoreCase(b.id));
+            CACHED_VANILLA = List.copyOf(built);
+            return CACHED_VANILLA;
+        }
     }
 }

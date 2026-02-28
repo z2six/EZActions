@@ -6,6 +6,8 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
+import net.neoforged.neoforge.client.settings.KeyConflictContext;
+import net.neoforged.neoforge.client.settings.KeyModifier;
 import org.z2six.ezactions.Constants;
 import org.z2six.ezactions.data.menu.MenuItem;
 import org.z2six.ezactions.data.menu.RadialMenu;
@@ -58,6 +60,9 @@ public final class BundleHotkeyManager {
 
                 KeyMapping mapping = new KeyMapping(
                         keyName,
+                        KeyConflictContext.IN_GAME,
+                        KeyModifier.NONE,
+                        InputConstants.Type.KEYSYM,
                         InputConstants.UNKNOWN.getValue(), // default: unbound
                         category
                 );

@@ -66,7 +66,7 @@ public final class DesignClientConfig {
         ringColor           = b.comment("ARGB color as int (0xAARRGGBB). Signed 32-bit; negatives are normal for opaque colors.")
                 .defineInRange("ringColor", 0xAA000000, Integer.MIN_VALUE, Integer.MAX_VALUE);
         hoverColor          = b.comment("Hover ARGB color as int (0xAARRGGBB).")
-                .defineInRange("hoverColor", 0xFFF20044, Integer.MIN_VALUE, Integer.MAX_VALUE);
+                .defineInRange("hoverColor", 0xFFFC0553, Integer.MIN_VALUE, Integer.MAX_VALUE);
         borderColor         = b.comment("Border ARGB color as int (0xAARRGGBB).")
                 .defineInRange("borderColor", 0x66FFFFFF, Integer.MIN_VALUE, Integer.MAX_VALUE);
         textColor           = b.comment("Center text ARGB color as int (0xAARRGGBB).")

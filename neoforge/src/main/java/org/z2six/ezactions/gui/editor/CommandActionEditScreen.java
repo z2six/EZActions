@@ -151,6 +151,7 @@ public final class CommandActionEditScreen extends Screen {
         bodyY = panel.y() + 34;
         bodyW = panel.w() - 28;
         bodyH = panel.h() - 42;
+        int contentW = Math.max(140, bodyW - 12); // keep clear of the scrollbar gutter
 
         int iconAreaW = 58;
         int fieldW = Math.max(210, bodyW - iconAreaW - 14);
@@ -198,7 +199,7 @@ public final class CommandActionEditScreen extends Screen {
                 this.font,
                 bodyX,
                 cmdY,
-                bodyW,
+                contentW,
                 cmdH,
                 Component.translatable("ezactions.gui.field.command"),
                 Component.literal(draftCommand)
@@ -222,7 +223,7 @@ public final class CommandActionEditScreen extends Screen {
                 .pos(bodyX, cycleY)
                 .selected(draftCycleCommands)
                 .onValueChange((cb, value) -> draftCycleCommands = value)
-                .maxWidth(bodyW - 24)
+                .maxWidth(contentW - 24)
                 .build();
         scroll.track(addRenderableWidget(cycleCommandsBox));
 

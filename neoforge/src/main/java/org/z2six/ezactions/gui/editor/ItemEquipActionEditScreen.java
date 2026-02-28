@@ -308,8 +308,8 @@ public final class ItemEquipActionEditScreen extends Screen {
             int x = p[0];
             int y = p[1];
 
-            g.fill(x - 1, y - 1, x + SLOT + 1, y + SLOT + 1, 0x6E3A506A);
-            g.fill(x, y, x + SLOT, y + SLOT, 0xD6162231);
+            g.fill(x - 1, y - 1, x + SLOT + 1, y + SLOT + 1, 0x6E2B2B2B);
+            g.fill(x, y, x + SLOT, y + SLOT, 0xD6101010);
 
             ClickActionItemEquip.StoredItem st = draftTargets.get(slot);
             if (st != null) {
@@ -365,8 +365,8 @@ public final class ItemEquipActionEditScreen extends Screen {
             int x = sourceX + (col * pitch);
             int y = drawSourceY + (row * pitch);
 
-            g.fill(x - 1, y - 1, x + SRC_CELL + 1, y + SRC_CELL + 1, 0x445E7996);
-            g.fill(x, y, x + SRC_CELL, y + SRC_CELL, 0xCC121B27);
+            g.fill(x - 1, y - 1, x + SRC_CELL + 1, y + SRC_CELL + 1, 0x44444444);
+            g.fill(x, y, x + SRC_CELL, y + SRC_CELL, 0xCC111111);
 
             ItemStack st = source.get(i).stack;
             g.renderItem(st, x + 2, y + 2);

@@ -71,7 +71,7 @@ public final class KeyboardHandler {
             // --- Determine which "open radial" hotkey (if any) is currently physically DOWN ---
 
             boolean rootDown = EZActionsKeybinds.OPEN_MENU != null
-                    && isPhysicallyDown(mc, EZActionsKeybinds.OPEN_MENU);
+                    && isHotkeyDown(mc, EZActionsKeybinds.OPEN_MENU);
 
             String bundleIdDown = null;
             if (!rootDown) {
@@ -79,7 +79,7 @@ public final class KeyboardHandler {
                 for (Map.Entry<String, KeyMapping> entry : BundleHotkeyManager.getBundleKeyMappings().entrySet()) {
                     KeyMapping mapping = entry.getValue();
                     if (mapping == null) continue;
-                    if (isPhysicallyDown(mc, mapping)) {
+                    if (isHotkeyDown(mc, mapping)) {
                         bundleIdDown = entry.getKey();
                         break;
                     }
@@ -173,6 +173,62 @@ public final class KeyboardHandler {
             case MOUSE -> GLFW.glfwGetMouseButton(window, key.getValue()) == GLFW.GLFW_PRESS;
             default -> false;
         };
+    }
+
+    /** True when a keybind is currently pressed and all required key modifiers are held. */
+    private static boolean isHotkeyDown(Minecraft mc, KeyMapping mapping) {
+        if (mapping == null || mc == null) return false;
+
+        boolean down = false;
+        try { down = mapping.isDown(); } catch (Throwable ignored) {}
+        if (!down) {
+            down = isPhysicallyDown(mc, mapping);
+        }
+        if (!down) return false;
+
+        RequiredMods req = detectRequiredModifiers(mapping);
+        if (!req.any()) return true;
+
+        long window = (mc.getWindow() == null) ? 0L : mc.getWindow().getWindow();
+        if (window == 0L) return false;
+
+        if (req.ctrl && !isModifierDown(window, GLFW.GLFW_KEY_LEFT_CONTROL, GLFW.GLFW_KEY_RIGHT_CONTROL)) return false;
+        if (req.shift && !isModifierDown(window, GLFW.GLFW_KEY_LEFT_SHIFT, GLFW.GLFW_KEY_RIGHT_SHIFT)) return false;
+        if (req.alt && !isModifierDown(window, GLFW.GLFW_KEY_LEFT_ALT, GLFW.GLFW_KEY_RIGHT_ALT)) return false;
+        return true;
+    }
+
+    private static boolean isModifierDown(long window, int leftKey, int rightKey) {
+        return isKeyDown(window, leftKey) || isKeyDown(window, rightKey);
+    }
+
+    private static boolean isKeyDown(long window, int key) {
+        try {
+            int state = GLFW.glfwGetKey(window, key);
+            return state == GLFW.GLFW_PRESS || state == GLFW.GLFW_REPEAT;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static RequiredMods detectRequiredModifiers(KeyMapping mapping) {
+        try {
+            var m = mapping.getClass().getMethod("getKeyModifier");
+            Object km = m.invoke(mapping);
+            if (!(km instanceof Enum<?> e)) return RequiredMods.NONE;
+            String n = e.name();
+            boolean ctrl = "CONTROL".equals(n) || "CTRL".equals(n);
+            boolean shift = "SHIFT".equals(n);
+            boolean alt = "ALT".equals(n);
+            return new RequiredMods(ctrl, shift, alt);
+        } catch (Throwable ignored) {
+            return RequiredMods.NONE;
+        }
+    }
+
+    private record RequiredMods(boolean ctrl, boolean shift, boolean alt) {
+        static final RequiredMods NONE = new RequiredMods(false, false, false);
+        boolean any() { return ctrl || shift || alt; }
     }
 
     // --- movement passthrough ---

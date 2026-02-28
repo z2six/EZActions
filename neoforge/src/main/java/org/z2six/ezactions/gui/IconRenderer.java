@@ -11,6 +11,9 @@ import org.z2six.ezactions.Constants;
 import org.z2six.ezactions.data.icon.IconSpec;
 import org.z2six.ezactions.util.CustomIconManager;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
  * Renders IconSpec to the screen. Currently supports ITEM icons.
  * Uses ResourceLocation.tryParse for 1.21.x compatibility and falls back safely.
@@ -18,6 +21,7 @@ import org.z2six.ezactions.util.CustomIconManager;
 public final class IconRenderer {
 
     private IconRenderer() {}
+    private static final Map<String, ItemStack> ITEM_STACK_CACHE = new ConcurrentHashMap<>();
 
     public static void drawIcon(GuiGraphics g, int x, int y, IconSpec icon) {
         try {
@@ -27,8 +31,8 @@ public final class IconRenderer {
             }
             switch (icon.kind()) {
                 case ITEM -> {
-                    Item item = resolveItem(icon.id());
-                    drawItem(g, x, y, new ItemStack(item));
+                    ItemStack stack = cachedStack(icon.id());
+                    drawItem(g, x, y, stack);
                 }
                 case CUSTOM -> {
                     ResourceLocation tex = CustomIconManager.textureForId(icon.id());
@@ -56,6 +60,11 @@ public final class IconRenderer {
         } catch (Throwable t) {
             return getFallbackItem();
         }
+    }
+
+    private static ItemStack cachedStack(String id) {
+        String key = (id == null || id.isBlank()) ? "minecraft:barrier" : id;
+        return ITEM_STACK_CACHE.computeIfAbsent(key, k -> new ItemStack(resolveItem(k)));
     }
 
     private static Item getFallbackItem() {

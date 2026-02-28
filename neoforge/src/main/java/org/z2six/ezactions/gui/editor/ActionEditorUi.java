@@ -16,17 +16,19 @@ import java.util.function.Function;
 /** Shared visual style and panel helpers for action editor screens. */
 public final class ActionEditorUi {
 
-    public static final int LABEL_COLOR = 0x9FB0C4;
-    public static final int BODY_TEXT = 0xDCE7F5;
-    public static final int MUTED_TEXT = 0x8FA0B5;
-    public static final int CARD_BG = 0xCC121B27;
-    public static final int CARD_EDGE = 0x6E2D425A;
+    public static final int LABEL_COLOR = 0xB8B8B8;
+    public static final int BODY_TEXT = 0xE5E5E5;
+    public static final int MUTED_TEXT = 0x9B9B9B;
+    public static final int ACCENT = 0xFFFC0553;
+    public static final int ACCENT_SOFT = 0x66FC0553;
+    public static final int CARD_BG = 0xCC111111;
+    public static final int CARD_EDGE = 0x6E2B2B2B;
 
-    private static final int SCRIM_BG = 0x96060B11;
-    private static final int PANEL_BG = 0xDE0F1722;
-    private static final int PANEL_BORDER = 0xAA2C425B;
-    private static final int HEADER_BG = 0xF0182433;
-    private static final int HEADER_ACCENT = 0xFF49A0FF;
+    private static final int SCRIM_BG = 0x96000000;
+    private static final int PANEL_BG = 0xDE0F0F0F;
+    private static final int PANEL_BORDER = 0xAA3A3A3A;
+    private static final int HEADER_BG = 0xF0141414;
+    private static final int HEADER_ACCENT = ACCENT;
 
     private ActionEditorUi() {}
 
@@ -48,7 +50,7 @@ public final class ActionEditorUi {
         g.fill(panel.x(), panel.y(), panel.right(), panel.y() + 26, HEADER_BG);
         g.fill(panel.x() + 1, panel.y() + 25, panel.right() - 1, panel.y() + 26, HEADER_ACCENT);
 
-        g.drawCenteredString(font, title, panel.x() + (panel.w() / 2), panel.y() + 9, 0xEAF2FC);
+        g.drawCenteredString(font, title, panel.x() + (panel.w() / 2), panel.y() + 9, 0xFFF2F2F2);
     }
 
     public static void drawCard(GuiGraphics g, Font font, int x, int y, int w, int h, Component heading) {
@@ -76,8 +78,8 @@ public final class ActionEditorUi {
     }
 
     public static void drawIconCard(GuiGraphics g, Font font, int x, int y, int size, Component label, IconSpec icon, boolean hovered) {
-        int edge = hovered ? 0xFF66B5FF : 0x6E3A506A;
-        int fill = hovered ? 0xE61A2A3D : 0xD60F1722;
+        int edge = hovered ? 0xFFFC0553 : 0x6E2F2F2F;
+        int fill = hovered ? 0xE6252525 : 0xD6111111;
         g.fill(x - 1, y - 1, x + size + 1, y + size + 1, edge);
         g.fill(x, y, x + size, y + size, fill);
         if (label != null && !label.getString().isEmpty()) {
@@ -138,8 +140,8 @@ public final class ActionEditorUi {
     public static final class ScrollArea {
         private static final int SCROLL_STEP = 18;
         private static final int SB_W = 4;
-        private static final int SB_TRACK = 0x5530455D;
-        private static final int SB_KNOB = 0xCC87A7CC;
+        private static final int SB_TRACK = 0x66101010;
+        private static final int SB_KNOB = 0xFFFC0553;
 
         private final List<Entry> widgets = new ArrayList<>();
         private int contentTop = Integer.MAX_VALUE;
