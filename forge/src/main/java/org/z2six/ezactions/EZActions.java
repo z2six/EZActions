@@ -14,9 +14,9 @@ import org.z2six.ezactions.util.CustomIconManager;
 import org.z2six.ezactions.util.EZActionsKeybinds;
 
 @Mod(Constants.MOD_ID)
-public class ExampleMod {
+public class EZActions {
 
-    public ExampleMod() {
+    public EZActions() {
         Constants.LOG.info("[{}] Initializing... (client? {})", Constants.MOD_NAME, FMLEnvironment.dist == Dist.CLIENT);
 
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
