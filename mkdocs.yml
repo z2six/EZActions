@@ -54,11 +54,11 @@ plugins:
           default: true
           name: English
           build: true
-          link: /EZActions/
+          link: https://z2six.github.io/EZActions/
         - locale: zh
           name: 简体中文
           build: true
-          link: /EZActions/zh/
+          link: https://z2six.github.io/EZActions/zh/
           nav_translations:
             Home: 主页
             License: 许可证
@@ -73,7 +73,7 @@ plugins:
         - locale: ru
           name: Русский
           build: true
-          link: /EZActions/ru/
+          link: https://z2six.github.io/EZActions/ru/
           nav_translations:
             Home: Главная
             License: Лицензия
@@ -88,27 +88,27 @@ plugins:
         - locale: es
           name: Español
           build: true
-          link: /EZActions/es/
+          link: https://z2six.github.io/EZActions/es/
         - locale: pt-BR
           name: Português (Brasil)
           build: true
-          link: /EZActions/pt-BR/
+          link: https://z2six.github.io/EZActions/pt-BR/
         - locale: de
           name: Deutsch
           build: true
-          link: /EZActions/de/
+          link: https://z2six.github.io/EZActions/de/
         - locale: fr
           name: Français
           build: true
-          link: /EZActions/fr/
+          link: https://z2six.github.io/EZActions/fr/
         - locale: ja
           name: 日本語
           build: true
-          link: /EZActions/ja/
+          link: https://z2six.github.io/EZActions/ja/
         - locale: ko
           name: 한국어
           build: true
-          link: /EZActions/ko/
+          link: https://z2six.github.io/EZActions/ko/
 
 markdown_extensions:
   - admonition
