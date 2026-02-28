@@ -1,5 +1,10 @@
 # EZ Actions Wiki
 
+!!! tip "Language / 语言"
+    Use the **language switcher** icon in the top-right navigation bar to change wiki language.
+
+    使用右上角导航栏中的**语言切换**图标来切换 Wiki 语言。
+
 EZ Actions is a client-side Minecraft mod that gives you a fast radial menu for actions you use all the time.
 
 Think of it as your "combat + utility quick wheel": one hold key, one flick, done.

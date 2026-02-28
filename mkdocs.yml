@@ -5,6 +5,7 @@ theme:
   language: en
   icon:
     logo: material/gesture-tap-button
+    alternate: material/translate
   features:
     - navigation.tabs
     - navigation.sections
@@ -43,6 +44,62 @@ nav:
 
 plugins:
   - search
+  - i18n:
+      docs_structure: suffix
+      fallback_to_default: true
+      reconfigure_material: true
+      reconfigure_search: true
+      languages:
+        - locale: en
+          default: true
+          name: English
+          build: true
+        - locale: zh
+          name: 简体中文
+          build: true
+          nav_translations:
+            Home: 主页
+            License: 许可证
+            Main Menu Editor GUI: 主菜单编辑器界面
+            Key Action: 按键动作
+            Command Action: 命令动作
+            Item Equip Action: 装备切换动作
+            Bundles: 组合
+            Import Export: 导入导出
+            Configuration: 配置
+            API: API
+        - locale: ru
+          name: Русский
+          build: true
+          nav_translations:
+            Home: Главная
+            License: Лицензия
+            Main Menu Editor GUI: Редактор главного меню
+            Key Action: Key Action
+            Command Action: Command Action
+            Item Equip Action: Item Equip Action
+            Bundles: Bundle
+            Import Export: Импорт/Экспорт
+            Configuration: Конфигурация
+            API: API
+        - locale: es
+          name: Español
+          build: true
+        - locale: pt-BR
+          name: Português (Brasil)
+          build: true
+        - locale: de
+          name: Deutsch
+          build: true
+        - locale: fr
+          name: Français
+          build: true
+        - locale: ja
+          name: 日本語
+          build: true
+        - locale: ko
+          name: 한국어
+          build: true
 
 markdown_extensions:
   - admonition
