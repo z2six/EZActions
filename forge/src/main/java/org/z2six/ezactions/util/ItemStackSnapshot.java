@@ -20,7 +20,6 @@ public final class ItemStackSnapshot {
         JsonObject fallback = new JsonObject();
         try {
             if (stack == null || stack.isEmpty()) return fallback;
-            if (registries == null) return fallbackFor(stack);
 
             JsonElement el = ItemStack.CODEC.encodeStart(
                             JsonOps.INSTANCE, stack)
