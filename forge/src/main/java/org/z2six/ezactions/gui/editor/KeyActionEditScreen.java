@@ -1,8 +1,9 @@
 package org.z2six.ezactions.gui.editor;
 
-import net.minecraft.client.gui.GuiGraphics;
+import org.z2six.ezactions.gui.compat.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import org.z2six.ezactions.gui.EzScreen;
 import net.minecraft.network.chat.Component;
 import org.z2six.ezactions.Constants;
 import org.z2six.ezactions.data.click.ClickActionKey;
@@ -13,7 +14,7 @@ import org.z2six.ezactions.helper.InputInjector;
 
 import java.util.function.BiConsumer;
 
-public final class KeyActionEditScreen extends Screen {
+public final class KeyActionEditScreen extends EzScreen {
 
     @FunctionalInterface
     public interface SaveHandler extends BiConsumer<MenuItem, MenuItem> {}
@@ -101,7 +102,6 @@ public final class KeyActionEditScreen extends Screen {
 
         titleBox = new EditBox(this.font, fieldX, y, fieldW, 20, Component.translatable("ezactions.gui.field.title"));
         titleBox.setMaxLength(MAX_LEN_TITLE);
-        titleBox.setHint(Component.translatable("ezactions.gui.key_action.hint.title"));
         titleBox.setValue(draftTitle);
         titleBox.setResponder(s -> draftTitle = safe(s));
         scroll.track(addRenderableWidget(titleBox));
@@ -109,7 +109,6 @@ public final class KeyActionEditScreen extends Screen {
 
         noteBox = new EditBox(this.font, fieldX, y, fieldW, 20, Component.translatable("ezactions.gui.field.note"));
         noteBox.setMaxLength(MAX_LEN_NOTE);
-        noteBox.setHint(Component.translatable("ezactions.gui.hint.note_optional"));
         noteBox.setValue(draftNote);
         noteBox.setResponder(s -> draftNote = safe(s));
         scroll.track(addRenderableWidget(noteBox));
@@ -117,7 +116,6 @@ public final class KeyActionEditScreen extends Screen {
 
         mappingBox = new EditBox(this.font, fieldX, y, fieldW, 20, Component.translatable("ezactions.gui.field.mapping_name"));
         mappingBox.setMaxLength(MAX_LEN_MAPPING);
-        mappingBox.setHint(Component.translatable("ezactions.gui.key_action.hint.mapping"));
         mappingBox.setValue(draftMapping);
         wireMappingResponder();
         scroll.track(addRenderableWidget(mappingBox));
@@ -292,21 +290,21 @@ public final class KeyActionEditScreen extends Screen {
         ActionEditorUi.drawCard(g, this.font, bodyX, scroll.y(cardBaseY), bodyW, cardBaseH, Component.empty());
 
         if (titleBox != null) {
-            ActionEditorUi.drawFieldLabel(g, this.font, Component.translatable("ezactions.gui.field.title"), titleBox.getX(), titleBox.getY() - 10);
+            ActionEditorUi.drawFieldLabel(g, this.font, Component.translatable("ezactions.gui.field.title"), titleBox.x, titleBox.y - 10);
         }
         if (noteBox != null) {
-            ActionEditorUi.drawFieldLabel(g, this.font, Component.translatable("ezactions.gui.field.note"), noteBox.getX(), noteBox.getY() - 10);
+            ActionEditorUi.drawFieldLabel(g, this.font, Component.translatable("ezactions.gui.field.note"), noteBox.x, noteBox.y - 10);
         }
         if (mappingBox != null) {
-            ActionEditorUi.drawFieldLabel(g, this.font, Component.translatable("ezactions.gui.field.mapping_name"), mappingBox.getX(), mappingBox.getY() - 10);
+            ActionEditorUi.drawFieldLabel(g, this.font, Component.translatable("ezactions.gui.field.mapping_name"), mappingBox.x, mappingBox.y - 10);
         }
 
         ActionEditorUi.drawIconCard(g, this.font, iconX, scroll.y(iconBaseY), 32, Component.translatable("ezactions.gui.field.icon"), this.draftIcon, iconHit(mouseX, mouseY));
         scroll.drawScrollbar(g, bodyX, bodyY, bodyW, bodyH);
 
         if (mappingBox != null) {
-            int mbx = mappingBox.getX();
-            int mby = mappingBox.getY();
+            int mbx = mappingBox.x;
+            int mby = mappingBox.y;
             int mbw = mappingBox.getWidth();
             int mbh = mappingBox.getHeight();
             boolean over = mouseX >= mbx && mouseX < mbx + mbw && mouseY >= mby && mouseY < mby + mbh;
@@ -365,4 +363,7 @@ public final class KeyActionEditScreen extends Screen {
         return mouseX >= iconX && mouseX <= iconX + 32 && mouseY >= y && mouseY <= y + 32;
     }
 }
+
+
+
 

@@ -2,10 +2,11 @@
 package org.z2six.ezactions.gui.editor.config;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import org.z2six.ezactions.gui.compat.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import org.z2six.ezactions.gui.EzScreen;
 import net.minecraft.network.chat.Component;
 import org.z2six.ezactions.Constants;
 import org.z2six.ezactions.data.menu.RadialMenu;
@@ -20,7 +21,7 @@ import org.z2six.ezactions.config.RadialConfig;
 
 import java.util.Locale;
 
-public final class ConfigScreen extends Screen {
+public final class ConfigScreen extends EzScreen {
 
     private final Screen parent;
 
@@ -551,8 +552,8 @@ public final class ConfigScreen extends Screen {
         if (!widget.visible || !widget.active) {
             return false;
         }
-        int x = widget.getX();
-        int y = widget.getY();
+        int x = widget.x;
+        int y = widget.y;
         int w = widget.getWidth();
         int h = widget.getHeight();
         if (mouseX < x || mouseX > x + w || mouseY < y || mouseY > y + h) {
@@ -597,4 +598,7 @@ public final class ConfigScreen extends Screen {
         Minecraft.getInstance().setScreen(parent);
     }
 }
+
+
+
 

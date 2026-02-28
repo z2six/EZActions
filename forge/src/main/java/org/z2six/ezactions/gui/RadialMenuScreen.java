@@ -2,7 +2,7 @@
 package org.z2six.ezactions.gui;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import org.z2six.ezactions.gui.compat.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.z2six.ezactions.Constants;
@@ -30,7 +30,7 @@ import java.util.List;
  * - Uses RadialMenu.visibleItemsForDisplay() so items flagged hideFromMainRadial are
  *   hidden from the root radial, while still existing in the model for bundle hotkeys.
  */
-public final class RadialMenuScreen extends Screen implements NoMenuBlurScreen {
+public final class RadialMenuScreen extends EzScreen implements NoMenuBlurScreen {
 
     private int hoveredIndex = -1;
 
@@ -206,3 +206,6 @@ public final class RadialMenuScreen extends Screen implements NoMenuBlurScreen {
         }
     }
 }
+
+
+

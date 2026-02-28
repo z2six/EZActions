@@ -97,10 +97,10 @@ public final class ClickActionCommand implements IClickAction {
 
                 mc.execute(() -> {
                     try {
-                        player.connection.sendCommand(one);
+                        player.commandSigned(one, null);
                         Constants.LOG.debug("[{}] Sent cycled command [{} / {}]: {}", Constants.MOD_NAME, pick + 1, lines.length, one);
                     } catch (Throwable t) {
-                        Constants.LOG.warn("[{}] cycled sendCommand failed for '{}': {}", Constants.MOD_NAME, one, t.toString());
+                        Constants.LOG.warn("[{}] cycled command send failed for '{}': {}", Constants.MOD_NAME, one, t.toString());
                     }
                 });
                 return true;
@@ -113,10 +113,10 @@ public final class ClickActionCommand implements IClickAction {
                 mc.execute(() -> {
                     for (String cmd : lines) {
                         try {
-                            player.connection.sendCommand(cmd);
+                            player.commandSigned(cmd, null);
                             Constants.LOG.debug("[{}] Sent command: {}", Constants.MOD_NAME, cmd);
                         } catch (Throwable t) {
-                            Constants.LOG.warn("[{}] sendCommand failed for '{}': {}", Constants.MOD_NAME, cmd, t.toString());
+                            Constants.LOG.warn("[{}] command send failed for '{}': {}", Constants.MOD_NAME, cmd, t.toString());
                         }
                     }
                 });

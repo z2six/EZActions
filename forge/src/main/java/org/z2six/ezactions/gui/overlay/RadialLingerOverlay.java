@@ -1,6 +1,6 @@
 package org.z2six.ezactions.gui.overlay;
 
-import net.minecraft.client.gui.GuiGraphics;
+import org.z2six.ezactions.gui.compat.GuiGraphics;
 import org.z2six.ezactions.Constants;
 import org.z2six.ezactions.data.icon.IconSpec;
 import org.z2six.ezactions.gui.IconRenderer;
@@ -85,3 +85,4 @@ public final class RadialLingerOverlay {
         JOBS.clear();
     }
 }
+

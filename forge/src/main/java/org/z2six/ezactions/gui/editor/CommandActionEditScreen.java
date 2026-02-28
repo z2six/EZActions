@@ -1,10 +1,11 @@
 package org.z2six.ezactions.gui.editor;
 
-import net.minecraft.client.gui.GuiGraphics;
+import org.z2six.ezactions.gui.compat.GuiGraphics;
 import net.minecraft.client.gui.components.Checkbox;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.client.gui.screens.Screen;
+import org.z2six.ezactions.gui.EzScreen;
 import net.minecraft.network.chat.Component;
 import org.z2six.ezactions.Constants;
 import org.z2six.ezactions.config.GeneralClientConfig;
@@ -16,7 +17,7 @@ import org.z2six.ezactions.data.menu.RadialMenu;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
-public final class CommandActionEditScreen extends Screen {
+public final class CommandActionEditScreen extends EzScreen {
 
     private final Screen parent;
     private final MenuItem editing;
@@ -163,14 +164,12 @@ public final class CommandActionEditScreen extends Screen {
         int y = bodyY + 18;
 
         titleBox = new EditBox(this.font, fieldX, y, fieldW, 20, Component.translatable("ezactions.gui.field.title"));
-        titleBox.setHint(Component.translatable("ezactions.gui.command_action.hint.title"));
         titleBox.setValue(draftTitle);
         titleBox.setResponder(s -> draftTitle = safe(s));
         scroll.track(addRenderableWidget(titleBox));
         y += 30;
 
         noteBox = new EditBox(this.font, fieldX, y, fieldW, 20, Component.translatable("ezactions.gui.field.note"));
-        noteBox.setHint(Component.translatable("ezactions.gui.hint.note_optional"));
         noteBox.setValue(draftNote);
         noteBox.setResponder(s -> draftNote = safe(s));
         scroll.track(addRenderableWidget(noteBox));
@@ -294,16 +293,16 @@ public final class CommandActionEditScreen extends Screen {
         ActionEditorUi.drawCard(g, this.font, bodyX, scroll.y(cardBaseY), bodyW, cardBaseH, Component.empty());
 
         if (titleBox != null) {
-            ActionEditorUi.drawFieldLabel(g, this.font, Component.translatable("ezactions.gui.field.title"), titleBox.getX(), titleBox.getY() - 10);
+            ActionEditorUi.drawFieldLabel(g, this.font, Component.translatable("ezactions.gui.field.title"), titleBox.x, titleBox.y - 10);
         }
         if (noteBox != null) {
-            ActionEditorUi.drawFieldLabel(g, this.font, Component.translatable("ezactions.gui.field.note"), noteBox.getX(), noteBox.getY() - 10);
+            ActionEditorUi.drawFieldLabel(g, this.font, Component.translatable("ezactions.gui.field.note"), noteBox.x, noteBox.y - 10);
         }
         if (cmdBox != null) {
-            ActionEditorUi.drawFieldLabel(g, this.font, Component.translatable("ezactions.gui.field.command"), cmdBox.getX(), cmdBox.getY() - 10);
+            ActionEditorUi.drawFieldLabel(g, this.font, Component.translatable("ezactions.gui.field.command"), cmdBox.x, cmdBox.y - 10);
         }
         if (delayBox != null) {
-            ActionEditorUi.drawFieldLabel(g, this.font, Component.translatable("ezactions.gui.command_action.field.multi_delay_ticks"), delayBox.getX(), delayBox.getY() - 10);
+            ActionEditorUi.drawFieldLabel(g, this.font, Component.translatable("ezactions.gui.command_action.field.multi_delay_ticks"), delayBox.x, delayBox.y - 10);
         }
 
         ActionEditorUi.drawIconCard(g, this.font, iconX, scroll.y(iconBaseY), 32, Component.translatable("ezactions.gui.field.icon"), this.draftIcon, iconHit(mouseX, mouseY));
@@ -352,4 +351,7 @@ public final class CommandActionEditScreen extends Screen {
         return mouseX >= iconX && mouseX <= iconX + 32 && mouseY >= y && mouseY <= y + 32;
     }
 }
+
+
+
 

@@ -2,15 +2,16 @@
 package org.z2six.ezactions.gui.editor;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import org.z2six.ezactions.gui.compat.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.core.registries.BuiltInRegistries;
+import org.z2six.ezactions.gui.EzScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraftforge.registries.ForgeRegistries;
 import org.z2six.ezactions.Constants;
 import org.z2six.ezactions.data.icon.IconSpec;
 import org.z2six.ezactions.gui.IconRenderer;
@@ -24,7 +25,7 @@ import java.util.Locale;
 import java.util.function.Consumer;
 
 /** Scrollable icon grid (vanilla items + custom 16x16 PNG icons). */
-public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
+public final class IconPickerScreen extends EzScreen implements NoMenuBlurScreen {
 
     private record PickEntry(IconSpec icon, String id, String searchText, String displayName, boolean custom) {}
 
@@ -60,7 +61,6 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
             filterBox = new EditBox(this.font, PADDING, PADDING,
                     Math.max(120, this.width - PADDING * 2 - 20), 18, Component.translatable("ezactions.gui.field.filter"));
             filterBox.setValue(filter);
-            filterBox.setHint(Component.translatable("ezactions.gui.icon_picker.hint.filter"));
             filterBox.setResponder(s -> {
                 filter = s;
                 updateFiltered();
@@ -343,7 +343,7 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
             if (cache != null) return cache;
 
             List<PickEntry> built = new ArrayList<>();
-            for (var e : BuiltInRegistries.ITEM.entrySet()) {
+            for (var e : ForgeRegistries.ITEMS.getEntries()) {
                 ResourceLocation rl = e.getKey().location();
                 String id = rl.getNamespace() + ":" + rl.getPath();
                 Item item = e.getValue();
@@ -359,4 +359,7 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
         }
     }
 }
+
+
+
 

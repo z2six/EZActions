@@ -10,7 +10,7 @@ import java.util.ArrayDeque;
 /**
  * Simple client-side sequencer for multi-command actions.
  * Enqueue a list of commands with a per-line delay (in ticks). Each client tick
- * decrements the timer; when it hits 0, we send the next command via sendCommand.
+ * decrements the timer; when it hits 0, we send the next command.
  *
  * Crash-safe: skips gracefully if player or connection goes away; clears queue.
  * Thread model: called and ticked on the client thread.
@@ -63,7 +63,7 @@ public final class CommandSequencer {
 
             // Send on the client thread; we are already on it in client tick.
             try {
-                p.connection.sendCommand(next);
+                p.commandSigned(next, null);
                 Constants.LOG.debug("[{}] Sequencer sent command: {}", Constants.MOD_NAME, next);
             } catch (Throwable t) {
                 Constants.LOG.warn("[{}] Sequencer send failed for '{}': {}", Constants.MOD_NAME, next, t.toString());

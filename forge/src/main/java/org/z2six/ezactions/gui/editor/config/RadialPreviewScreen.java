@@ -1,7 +1,8 @@
 package org.z2six.ezactions.gui.editor.config;
 
-import net.minecraft.client.gui.GuiGraphics;
+import org.z2six.ezactions.gui.compat.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import org.z2six.ezactions.gui.EzScreen;
 import net.minecraft.network.chat.Component;
 import org.z2six.ezactions.data.icon.IconSpec;
 import org.z2six.ezactions.data.menu.MenuItem;
@@ -16,7 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** Looped visual preview for radial style/animation config. */
-public final class RadialPreviewScreen extends Screen implements NoMenuBlurScreen {
+public final class RadialPreviewScreen extends EzScreen implements NoMenuBlurScreen {
     private static final long HOLD_MS = 1000L;
 
     private final Screen parent;
@@ -130,3 +131,5 @@ public final class RadialPreviewScreen extends Screen implements NoMenuBlurScree
         return false;
     }
 }
+
+

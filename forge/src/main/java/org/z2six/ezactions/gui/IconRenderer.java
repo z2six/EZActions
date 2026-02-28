@@ -1,12 +1,12 @@
 // MainFile: src/main/java/org/z2six/ezactions/gui/IconRenderer.java
 package org.z2six.ezactions.gui;
 
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.core.registries.BuiltInRegistries;
+import org.z2six.ezactions.gui.compat.GuiGraphics;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraftforge.registries.ForgeRegistries;
 import org.z2six.ezactions.Constants;
 import org.z2six.ezactions.data.icon.IconSpec;
 import org.z2six.ezactions.util.CustomIconManager;
@@ -55,7 +55,7 @@ public final class IconRenderer {
         try {
             ResourceLocation rl = ResourceLocation.tryParse(id);
             if (rl == null) return getFallbackItem();
-            Item it = BuiltInRegistries.ITEM.get(rl);
+            Item it = ForgeRegistries.ITEMS.getValue(rl);
             return it == null ? getFallbackItem() : it;
         } catch (Throwable t) {
             return getFallbackItem();
@@ -76,3 +76,4 @@ public final class IconRenderer {
         g.renderItem(stack, x - 8, y - 8); // center around (x,y)
     }
 }
+

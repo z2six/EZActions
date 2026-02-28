@@ -4,9 +4,10 @@ package org.z2six.ezactions.gui.editor;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
-import net.minecraft.client.gui.GuiGraphics;
+import org.z2six.ezactions.gui.compat.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import org.z2six.ezactions.gui.EzScreen;
 import net.minecraft.network.chat.Component;
 import org.z2six.ezactions.Constants;
 import org.z2six.ezactions.gui.noblur.NoMenuBlurScreen;
@@ -27,7 +28,7 @@ import java.util.function.Consumer;
  * - Filter box: filters by mapping id, localized label ("flavor text"), and mod/category text.
  * - Results stay grouped by mod (header per mod), not a flat list.
  */
-public final class KeybindPickerScreen extends Screen implements NoMenuBlurScreen {
+public final class KeybindPickerScreen extends EzScreen implements NoMenuBlurScreen {
 
     private final Screen parent;
     private final Consumer<String> onPick;
@@ -81,7 +82,6 @@ public final class KeybindPickerScreen extends Screen implements NoMenuBlurScree
             int fy = PADDING;
             int fw = Math.max(60, this.width - (PADDING * 2) - 8); // leave a tiny right margin for scrollbar area
             filterBox = new EditBox(this.font, fx, fy, fw, FILTER_H, Component.translatable("ezactions.gui.field.filter"));
-            filterBox.setHint(Component.translatable("ezactions.gui.keybind_picker.hint.filter"));
             filterBox.setMaxLength(FILTER_MAX_LEN);
             filterBox.setResponder(s -> {
                 try {
@@ -557,3 +557,6 @@ public final class KeybindPickerScreen extends Screen implements NoMenuBlurScree
         Minecraft.getInstance().setScreen(parent);
     }
 }
+
+
+

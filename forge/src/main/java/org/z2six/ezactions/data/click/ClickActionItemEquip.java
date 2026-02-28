@@ -3,7 +3,6 @@ package org.z2six.ezactions.data.click;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
@@ -83,10 +82,10 @@ public final class ClickActionItemEquip implements IClickAction {
             }
         }
 
-        public static @Nullable StoredItem fromStack(ItemStack stack, HolderLookup.Provider registries) {
+        public static @Nullable StoredItem fromStack(ItemStack stack) {
             try {
                 if (stack == null || stack.isEmpty()) return null;
-                JsonObject encoded = ItemStackSnapshot.encode(stack, registries);
+                JsonObject encoded = ItemStackSnapshot.encode(stack);
                 String sig = ItemStackSnapshot.signatureNoCount(encoded);
                 String id = ItemStackSnapshot.itemId(stack);
                 String name = stack.getHoverName().getString();

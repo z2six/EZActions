@@ -4,10 +4,11 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.mojang.serialization.JsonOps;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.registries.ForgeRegistries;
 import org.z2six.ezactions.Constants;
 
 /** Helpers to capture and compare full ItemStack data while ignoring stack count. */
@@ -16,28 +17,30 @@ public final class ItemStackSnapshot {
 
     private ItemStackSnapshot() {}
 
-    public static JsonObject encode(ItemStack stack, HolderLookup.Provider registries) {
+    public static JsonObject encode(ItemStack stack) {
         JsonObject fallback = new JsonObject();
         try {
             if (stack == null || stack.isEmpty()) return fallback;
-            if (registries == null) return fallbackFor(stack);
-
-            JsonElement el = ItemStack.CODEC.encodeStart(
-                            JsonOps.INSTANCE, stack)
-                    .result()
-                    .orElse(null);
-            if (el != null && el.isJsonObject()) {
-                return el.getAsJsonObject();
-            }
-            return fallbackFor(stack);
+            JsonObject out = new JsonObject();
+            out.addProperty("itemId", itemId(stack));
+            out.addProperty("nbt", stack.save(new CompoundTag()).toString());
+            out.addProperty("signature", signatureNoCount(stack));
+            return out;
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] ItemStackSnapshot.encode failed: {}", Constants.MOD_NAME, t.toString());
             return fallbackFor(stack);
         }
     }
 
-    public static String signatureNoCount(ItemStack stack, HolderLookup.Provider registries) {
-        return signatureNoCount(encode(stack, registries));
+    public static String signatureNoCount(ItemStack stack) {
+        try {
+            if (stack == null || stack.isEmpty()) return "{}";
+            CompoundTag nbt = stack.save(new CompoundTag());
+            Tag stripped = stripCount(nbt);
+            return stripped.toString();
+        } catch (Throwable t) {
+            return "{}";
+        }
     }
 
     public static String signatureNoCount(JsonObject encoded) {
@@ -50,7 +53,10 @@ public final class ItemStackSnapshot {
     }
 
     public static String itemId(ItemStack stack) {
-        try { return BuiltInRegistries.ITEM.getKey(stack.getItem()).toString(); }
+        try {
+            var key = ForgeRegistries.ITEMS.getKey(stack.getItem());
+            return key == null ? "minecraft:air" : key.toString();
+        }
         catch (Throwable t) { return "minecraft:air"; }
     }
 
@@ -77,5 +83,26 @@ public final class ItemStackSnapshot {
             return out;
         }
         return el.deepCopy();
+    }
+
+    private static Tag stripCount(Tag tag) {
+        if (tag == null) return new CompoundTag();
+        if (tag instanceof CompoundTag in) {
+            CompoundTag out = new CompoundTag();
+            for (String key : in.getAllKeys()) {
+                if ("count".equalsIgnoreCase(key) || "Count".equalsIgnoreCase(key)) continue;
+                Tag child = in.get(key);
+                out.put(key, stripCount(child));
+            }
+            return out;
+        }
+        if (tag instanceof ListTag inList) {
+            ListTag out = new ListTag();
+            for (Tag child : inList) {
+                out.add(stripCount(child));
+            }
+            return out;
+        }
+        return tag.copy();
     }
 }

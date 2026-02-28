@@ -2,9 +2,10 @@
 package org.z2six.ezactions.gui.editor;
 
 import net.minecraft.ChatFormatting;
-import net.minecraft.client.gui.GuiGraphics;
+import org.z2six.ezactions.gui.compat.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import org.z2six.ezactions.gui.EzScreen;
 import net.minecraft.network.chat.Component;
 import org.z2six.ezactions.Constants;
 import org.z2six.ezactions.data.click.ClickActionType;
@@ -41,7 +42,7 @@ import java.util.Objects;
  * - Hovering the bookmark shows the note as a tooltip. (The rest of the row behaves unchanged.)
  */
 
-public final class MenuEditorScreen extends Screen {
+public final class MenuEditorScreen extends EzScreen {
 
     // Layout constants
     private static final int PAD = 8;
@@ -329,7 +330,6 @@ public final class MenuEditorScreen extends Screen {
 
         // Filter
         filterBox = new EditBox(this.font, x, y, LEFT_W, 20, Component.translatable("ezactions.gui.field.filter"));
-        filterBox.setHint(Component.translatable("ezactions.gui.menu_editor.hint.filter"));
         filterBox.setResponder(s -> rebuildRows());
         addRenderableWidget(filterBox);
         y += 24;
@@ -1059,7 +1059,7 @@ public final class MenuEditorScreen extends Screen {
         if ((modifiers & GLFW.GLFW_MOD_CONTROL) != 0 && keyCode == GLFW.GLFW_KEY_F) {
             if (filterBox != null) {
                 setFocused(filterBox);
-                filterBox.setFocused(true);
+                filterBox.setFocus(true);
                 return true;
             }
         }
@@ -1133,4 +1133,7 @@ public final class MenuEditorScreen extends Screen {
         this.minecraft.setScreen(parent);
     }
 }
+
+
+
 

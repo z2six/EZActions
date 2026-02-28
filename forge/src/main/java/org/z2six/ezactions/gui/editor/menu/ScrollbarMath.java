@@ -1,7 +1,7 @@
 // MainFile: src/main/java/org/z2six/ezactions/gui/editor/menu/ScrollbarMath.java
 package org.z2six.ezactions.gui.editor.menu;
 
-import net.minecraft.client.gui.GuiGraphics;
+import org.z2six.ezactions.gui.compat.GuiGraphics;
 
 /**
  * // MainFile: src/main/java/org/z2six/ezactions/gui/editor/menu/ScrollbarMath.java
@@ -75,3 +75,4 @@ public final class ScrollbarMath {
         return t * maxScroll;
     }
 }
+

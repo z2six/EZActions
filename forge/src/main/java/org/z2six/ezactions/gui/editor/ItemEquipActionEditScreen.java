@@ -1,9 +1,10 @@
 package org.z2six.ezactions.gui.editor;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import org.z2six.ezactions.gui.compat.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import org.z2six.ezactions.gui.EzScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -20,7 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 /** Editor for ITEM_EQUIP action. */
-public final class ItemEquipActionEditScreen extends Screen {
+public final class ItemEquipActionEditScreen extends EzScreen {
 
     private static final int SLOT = 18;
     private static final int SRC_CELL = 20;
@@ -160,13 +161,11 @@ public final class ItemEquipActionEditScreen extends Screen {
         iconBaseY = topCardY + 34;
 
         titleBox = new EditBox(this.font, fieldX, topCardY + 26, fieldW, 20, Component.translatable("ezactions.gui.field.title"));
-        titleBox.setHint(Component.translatable("ezactions.gui.item_equip.hint.title"));
         titleBox.setValue(draftTitle);
         titleBox.setResponder(s -> draftTitle = safe(s));
         scroll.track(addRenderableWidget(titleBox));
 
         noteBox = new EditBox(this.font, fieldX, topCardY + 56, fieldW, 20, Component.translatable("ezactions.gui.field.note"));
-        noteBox.setHint(Component.translatable("ezactions.gui.hint.note_optional"));
         noteBox.setValue(draftNote);
         noteBox.setResponder(s -> draftNote = safe(s));
         scroll.track(addRenderableWidget(noteBox));
@@ -229,8 +228,7 @@ public final class ItemEquipActionEditScreen extends Screen {
         if (st == null || st.isEmpty()) {
             return;
         }
-        var regs = Minecraft.getInstance().player == null ? null : Minecraft.getInstance().player.level().registryAccess();
-        var stored = ClickActionItemEquip.StoredItem.fromStack(st, regs);
+        var stored = ClickActionItemEquip.StoredItem.fromStack(st);
         if (stored != null) {
             source.add(new SourceEntry(st.copy(), stored));
         }
@@ -281,10 +279,10 @@ public final class ItemEquipActionEditScreen extends Screen {
         ActionEditorUi.drawCard(g, this.font, sourceCardX, scroll.y(sourceCardY), sourceCardW, sourceCardH, Component.translatable("ezactions.gui.item_equip.card.source"));
 
         if (titleBox != null) {
-            ActionEditorUi.drawFieldLabel(g, this.font, Component.translatable("ezactions.gui.field.title"), titleBox.getX(), titleBox.getY() - 10);
+            ActionEditorUi.drawFieldLabel(g, this.font, Component.translatable("ezactions.gui.field.title"), titleBox.x, titleBox.y - 10);
         }
         if (noteBox != null) {
-            ActionEditorUi.drawFieldLabel(g, this.font, Component.translatable("ezactions.gui.field.note"), noteBox.getX(), noteBox.getY() - 10);
+            ActionEditorUi.drawFieldLabel(g, this.font, Component.translatable("ezactions.gui.field.note"), noteBox.x, noteBox.y - 10);
         }
 
         ActionEditorUi.drawIconCard(g, this.font, iconX, scroll.y(iconBaseY), 32, Component.translatable("ezactions.gui.field.icon"), draftIcon, iconHit(mouseX, mouseY));
@@ -560,4 +558,7 @@ public final class ItemEquipActionEditScreen extends Screen {
         return Component.translatable("ezactions.gui.item_equip.slot." + slot.key());
     }
 }
+
+
+
 

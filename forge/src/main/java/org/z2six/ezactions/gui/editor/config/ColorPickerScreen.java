@@ -2,10 +2,11 @@ package org.z2six.ezactions.gui.editor.config;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import org.z2six.ezactions.gui.compat.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import org.z2six.ezactions.gui.EzScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import org.z2six.ezactions.gui.editor.ActionEditorUi;
@@ -14,7 +15,7 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 /** Themed color picker with scrollable content area and shared editor styling. */
-public class ColorPickerScreen extends Screen {
+public class ColorPickerScreen extends EzScreen {
 
     private final Screen parent;
     private final Consumer<Integer> onPick;
@@ -402,4 +403,6 @@ public class ColorPickerScreen extends Screen {
         this.minecraft.setScreen(parent);
     }
 }
+
+
 

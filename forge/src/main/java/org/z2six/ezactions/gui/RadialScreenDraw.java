@@ -8,9 +8,9 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import org.z2six.ezactions.gui.compat.GuiGraphics;
 import net.minecraft.client.renderer.GameRenderer;
-import org.joml.Matrix4f;
+import com.mojang.math.Matrix4f;
 import org.z2six.ezactions.config.RadialAnimConfigView;
 import org.z2six.ezactions.config.RadialConfig;
 import org.z2six.ezactions.data.menu.MenuItem;
@@ -312,3 +312,4 @@ public final class RadialScreenDraw {
         } catch (Throwable ignored) {}
     }
 }
+

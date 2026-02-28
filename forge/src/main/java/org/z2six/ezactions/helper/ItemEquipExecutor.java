@@ -2,7 +2,6 @@ package org.z2six.ezactions.helper;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.item.ItemStack;
@@ -59,8 +58,6 @@ public final class ItemEquipExecutor {
             ACTIVE = null;
             return;
         }
-        HolderLookup.Provider regs = player.level().registryAccess();
-
         // Execute one queued click step per tick.
         if (!plan.pendingClicks.isEmpty()) {
             Integer slot = plan.pendingClicks.pollFirst();
@@ -84,11 +81,11 @@ public final class ItemEquipExecutor {
             if (targetSlotId < 0) continue;
 
             ItemStack targetStack = stackAt(menu, targetSlotId);
-            if (matches(targetStack, desired, regs)) {
+            if (matches(targetStack, desired)) {
                 continue; // already right item
             }
 
-            int sourceSlotId = findBestMatchingSource(menu, desired, targetSlotId, regs);
+            int sourceSlotId = findBestMatchingSource(menu, desired, targetSlotId);
             if (sourceSlotId < 0) {
                 // Desired item not found right now; skip this target only.
                 continue;
@@ -122,8 +119,7 @@ public final class ItemEquipExecutor {
 
     private static int findBestMatchingSource(AbstractContainerMenu menu,
                                               ClickActionItemEquip.StoredItem desired,
-                                              int excludeSlotId,
-                                              HolderLookup.Provider regs) {
+                                              int excludeSlotId) {
         int bestSlot = -1;
         int bestCount = -1;
 
@@ -131,30 +127,30 @@ public final class ItemEquipExecutor {
         for (int slot = SLOT_HELMET; slot <= SLOT_BOOTS; slot++) {
             if (slot == excludeSlotId) continue;
             ItemStack s = stackAt(menu, slot);
-            if (matches(s, desired, regs) && s.getCount() > bestCount) {
+            if (matches(s, desired) && s.getCount() > bestCount) {
                 bestSlot = slot; bestCount = s.getCount();
             }
         }
         for (int slot = 9; slot <= 44; slot++) {
             if (slot == excludeSlotId) continue;
             ItemStack s = stackAt(menu, slot);
-            if (matches(s, desired, regs) && s.getCount() > bestCount) {
+            if (matches(s, desired) && s.getCount() > bestCount) {
                 bestSlot = slot; bestCount = s.getCount();
             }
         }
         if (SLOT_OFFHAND != excludeSlotId) {
             ItemStack s = stackAt(menu, SLOT_OFFHAND);
-            if (matches(s, desired, regs) && s.getCount() > bestCount) {
+            if (matches(s, desired) && s.getCount() > bestCount) {
                 bestSlot = SLOT_OFFHAND; bestCount = s.getCount();
             }
         }
         return bestSlot;
     }
 
-    private static boolean matches(ItemStack stack, ClickActionItemEquip.StoredItem desired, HolderLookup.Provider regs) {
+    private static boolean matches(ItemStack stack, ClickActionItemEquip.StoredItem desired) {
         try {
             if (stack == null || stack.isEmpty() || desired == null) return false;
-            String sig = ItemStackSnapshot.signatureNoCount(stack, regs);
+            String sig = ItemStackSnapshot.signatureNoCount(stack);
             return desired.signatureNoCount().equals(sig);
         } catch (Throwable t) {
             return false;
@@ -180,4 +176,3 @@ public final class ItemEquipExecutor {
         }
     }
 }
-

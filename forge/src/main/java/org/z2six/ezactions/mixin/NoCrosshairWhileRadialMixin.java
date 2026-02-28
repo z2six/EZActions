@@ -2,7 +2,7 @@ package org.z2six.ezactions.mixin;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
-import net.minecraft.client.gui.GuiGraphics;
+import com.mojang.blaze3d.vertex.PoseStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -16,12 +16,12 @@ public abstract class NoCrosshairWhileRadialMixin {
     private static long ezactions$lastLogMs = 0L;
 
     @Inject(
-            method = "renderCrosshair(Lnet/minecraft/client/gui/GuiGraphics;)V",
+            method = "renderCrosshair(Lcom/mojang/blaze3d/vertex/PoseStack;)V",
             at = @At("HEAD"),
             cancellable = true
     )
-    private void ezactions$hideCrosshairWhileRadial_1201(GuiGraphics graphics, CallbackInfo ci) {
-        cancelIfRadialOpen(ci, "renderCrosshair(GuiGraphics)");
+    private void ezactions$hideCrosshairWhileRadial_1192(PoseStack poseStack, CallbackInfo ci) {
+        cancelIfRadialOpen(ci, "renderCrosshair(PoseStack)");
     }
 
     private static void cancelIfRadialOpen(CallbackInfo ci, String hookName) {

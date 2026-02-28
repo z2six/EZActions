@@ -1,8 +1,9 @@
 package org.z2six.ezactions.gui.editor;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import org.z2six.ezactions.gui.compat.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
@@ -98,9 +99,10 @@ public final class EditorCycleButton<T> extends AbstractButton {
     }
 
     @Override
-    protected void renderWidget(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        int x = getX();
-        int y = getY();
+    public void renderButton(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
+        GuiGraphics g = new GuiGraphics(Minecraft.getInstance(), poseStack);
+        int x = this.x;
+        int y = this.y;
         int w = getWidth();
         int h = getHeight();
         boolean hovered = isHoveredOrFocused();
@@ -144,7 +146,7 @@ public final class EditorCycleButton<T> extends AbstractButton {
     }
 
     @Override
-    protected void updateWidgetNarration(NarrationElementOutput output) {
+    public void updateNarration(NarrationElementOutput output) {
         defaultButtonNarrationText(output);
     }
 }

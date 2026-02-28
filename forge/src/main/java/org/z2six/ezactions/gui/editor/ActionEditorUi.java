@@ -1,7 +1,7 @@
 package org.z2six.ezactions.gui.editor;
 
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import org.z2six.ezactions.gui.compat.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.network.chat.Component;
 import org.z2six.ezactions.data.icon.IconSpec;
@@ -151,8 +151,8 @@ public final class ActionEditorUi {
 
         public <T extends AbstractWidget> T track(T widget) {
             if (widget == null) return null;
-            widgets.add(new Entry(widget, widget.getY()));
-            include(widget.getY(), widget.getY() + widget.getHeight());
+            widgets.add(new Entry(widget, widget.y));
+            include(widget.y, widget.y + widget.getHeight());
             return widget;
         }
 
@@ -184,7 +184,7 @@ public final class ActionEditorUi {
 
             for (Entry e : widgets) {
                 int y = e.baseY - offset;
-                e.widget.setY(y);
+                e.widget.y = y;
                 e.widget.visible = (y + e.widget.getHeight() > viewTop) && (y < viewBottom);
             }
         }
@@ -221,3 +221,6 @@ public final class ActionEditorUi {
         private record Entry(AbstractWidget widget, int baseY) {}
     }
 }
+
+
+
