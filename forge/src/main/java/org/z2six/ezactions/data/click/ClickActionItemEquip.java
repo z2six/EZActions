@@ -73,6 +73,12 @@ public final class ClickActionItemEquip implements IClickAction {
                 if (o == null) return null;
                 JsonObject stack = o.has("stack") && o.get("stack").isJsonObject() ? o.getAsJsonObject("stack") : new JsonObject();
                 String sig = o.has("signature") ? o.get("signature").getAsString() : ItemStackSnapshot.signatureNoCount(stack);
+                // 1.19.2 compatibility: recover a correct signature from encoded stack data when a wrapped/incorrect
+                // top-level signature was saved by older dev snapshots.
+                if ((sig == null || sig.isBlank() || sig.contains("\"itemId\"") || sig.contains("\"nbt\""))
+                        && stack.has("signature")) {
+                    try { sig = stack.get("signature").getAsString(); } catch (Throwable ignored) {}
+                }
                 String id = o.has("itemId") ? o.get("itemId").getAsString() : "minecraft:air";
                 String name = o.has("displayName") ? o.get("displayName").getAsString() : id;
                 return new StoredItem(sig, id, name, stack);
@@ -86,7 +92,7 @@ public final class ClickActionItemEquip implements IClickAction {
             try {
                 if (stack == null || stack.isEmpty()) return null;
                 JsonObject encoded = ItemStackSnapshot.encode(stack);
-                String sig = ItemStackSnapshot.signatureNoCount(encoded);
+                String sig = ItemStackSnapshot.signatureNoCount(stack);
                 String id = ItemStackSnapshot.itemId(stack);
                 String name = stack.getHoverName().getString();
                 return new StoredItem(sig, id, name, encoded);

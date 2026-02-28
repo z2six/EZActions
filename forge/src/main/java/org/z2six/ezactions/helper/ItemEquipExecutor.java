@@ -151,7 +151,19 @@ public final class ItemEquipExecutor {
         try {
             if (stack == null || stack.isEmpty() || desired == null) return false;
             String sig = ItemStackSnapshot.signatureNoCount(stack);
-            return desired.signatureNoCount().equals(sig);
+            if (desired.signatureNoCount().equals(sig)) return true;
+
+            // Compatibility for entries saved by older snapshots where the wrapped encoded JSON was used
+            // as the top-level signature string.
+            try {
+                var encoded = desired.encodedStack();
+                if (encoded != null && encoded.has("signature")) {
+                    String encodedSig = encoded.get("signature").getAsString();
+                    if (sig.equals(encodedSig)) return true;
+                }
+            } catch (Throwable ignored) {}
+
+            return false;
         } catch (Throwable t) {
             return false;
         }
