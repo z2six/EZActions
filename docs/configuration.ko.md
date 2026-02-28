@@ -1,46 +1,73 @@
-﻿# Configuration
+# 구성
 
-Menu Editor에서 `Config`를 엽니다.
+`Config` 버튼을 사용하여 메뉴 편집기에서 구성을 엽니다.
 
-섹션:
+구성 UI에는 세 가지 섹션이 있습니다.
 
-- General
-- Animations
-- Design
+- 일반
+- 애니메이션
+- 디자인
 
-## General
+## 일반적인
 
-- `Move While Radial Open`
-- `Show Hover Label`
-- `Command Editor Visible Lines` (1-20)
+| 설정 | 유형 | 범위/값 | 기본값 |
+|---|---|---|---|
+| 방사형이 열려 있는 동안 이동 | 부울 | 온/오프 | 켜짐 |
+| 호버 라벨 표시 | 부울 | 온/오프 | 켜짐 |
+| 명령 편집기 표시되는 선 | 정수 | 1-20 | 5 |
 
-## Animations
+## 애니메이션
 
-- `Animations Enabled`
-- `Open/Close Animation`
-- `Hover Animation`
-- `Open Style`: `WIPE`, `FADE`, `NONE`
-- `Direction`: `CW`, `CCW`
-- `Hover Style`: `FILL_SCALE`, `FILL_ONLY`, `SCALE_ONLY`, `NONE`
-- `Hover Grow Percent`: 0.0-0.5
-- `Open/Close Duration`: 0-2000 ms
+| 설정 | 유형 | 범위/값 | 기본값 |
+|---|---|---|---|
+| 애니메이션 활성화 | 부울 | 온/오프 | 켜짐 |
+| 애니메이션 열기/닫기 | 부울 | 온/오프 | 켜짐 |
+| 호버 애니메이션 | 부울 | 온/오프 | 켜짐 |
+| 오픈 스타일 | 열거형 | `WIPE`, `FADE`, `NONE` | `WIPE` |
+| 방향 | 열거형 | `CW`, `CCW` | `CW` |
+| 호버 스타일 | 열거형 | `FILL_SCALE`, `FILL_ONLY`, `SCALE_ONLY`, `NONE` | `FILL_SCALE` |
+| 호버 증가율 | 더블 | 0.0-0.5 | 0.05 |
+| 개설/마감 기간 | 정수(밀리초) | 0-2000 | 125 |
 
-## Design
+## 설계
 
-- `Deadzone`
-- `Outer Radius`
-- `Ring Thickness`
-- `Scale Start Threshold`
-- `Scale Per Item`
-- `Slice Gap`
-- `Design Style`: `SOLID`, `SEGMENTED`, `OUTLINE`, `GLASS`
-- 색상(`Ring/Hover/Border/Text`)은 ARGB int
+| 설정 | 유형 | 범위/값 | 기본값 |
+|---|---|---|---|
+| 데드존 | 정수 | 0-90 | 18 |
+| 외부 반경 | 정수 | 24-512 | 72 |
+| 링 두께 | 정수 | 6-256 | 28 |
+| 확장 시작 임계값 | 정수 | 0-128 | 8 |
+| 품목별 규모 | 정수 | 0-100 | 6 |
+| 슬라이스 갭 | 정수(도) | 0-12 | 0 |
+| 디자인 스타일 | 열거형 | `SOLID`, `SEGMENTED`, `OUTLINE`, `GLASS` | `SOLID` |
+| 링 색상 | ARGB 정수 | 32비트 부호 있는 정수 | `0xAA000000` |
+| 호버 색상 | ARGB 정수 | 32비트 부호 있는 정수 | `0xFFF20044` |
+| 테두리 색상 | ARGB 정수 | 32비트 부호 있는 정수 | `0x66FFFFFF` |
+| 텍스트 색상 | ARGB 정수 | 32비트 부호 있는 정수 | `0xFFFFFFFF` |
 
-## Preview
+## 미리보기
 
-`Preview`는 1초 간격으로 Radial 애니메이션 루프를 보여줍니다.
+`Preview`은 방사형 미리보기 화면을 열고 루프 사이에 1초 간격으로 애니메이션을 반복합니다.
 
-## Save
+이를 사용하여 커밋하기 전에 시각적 설정을 조정합니다.
 
-- Save 즉시 TOML 파일에 반영
-- 저장 후 부모 에디터로 복귀
+## 저장 동작
+
+- 저장은 구성 파일에 즉시 값을 씁니다.
+- 저장 시 화면은 상위 편집기 화면으로 돌아갑니다.
+
+## 구성 파일
+
+- `config/ezactions/general-client.toml`
+- `config/ezactions/anim-client.toml`
+- `config/ezactions/design-client.toml`
+
+???+ info "심층 분석: 색상 형식"
+    색상은 부호 있는 32비트 ARGB 정수로 저장됩니다.
+
+예:
+
+- `0xAARRGGBB`
+    - 알파 `AA`, 빨간색 `RR`, 녹색 `GG`, 파란색 `BB`
+
+불투명한 ARGB 값에는 음의 십진수가 일반적입니다.

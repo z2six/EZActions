@@ -1,43 +1,73 @@
-﻿# Acao de equipar item
+# Ação de equipar item
 
-`Acao de equipar item` salva um snapshot de equipamento e reequipa itens que batem com esse snapshot.
+Equipar itens permite que você salve um instantâneo do equipamento e reequipe os itens correspondentes do seu inventário.
 
-## Slots alvo
+## Slots de destino
 
-- Mainhand
-- Offhand
-- Helmet
-- Chestplate
-- Leggings
-- Boots
+Você pode atribuir qualquer um destes:
 
-Se um slot ficar vazio no editor, ele e ignorado na execucao.
+- Principal
+- De improviso
+- Capacete
+- Peitoral
+- Legging
+- Botas
 
-## Como criar
+Se um slot for deixado vazio no editor, o EZ Actions o ignora durante a execução.
 
-1. `Adicionar equipar item`
-2. Defina `Title`, `Note`, `Icon`
-3. Arraste itens de `Source Items` para `Equip Targets`
-4. Salve
+## Como criar um
 
-## Source Items inclui
+1. Clique em @@CÓDIGO0@@.
+2. Defina título/nota/ícone.
+3. Arraste itens da grade de origem para os slots de destino.
+4. Salve.
 
-- offhand atual
+### Grade de origem inclui
+
+- item improvisado atual
 - armadura equipada
-- inventario principal
-- hotbar
+- inventário principal
+- barra quente
 
-## Regras de matching
+## Durante a execução
 
-- Matching por snapshot completo (NBT e metadata), ignorando quantidade.
-- Se houver varios matches, usa a pilha com maior count.
+Quando você aciona a ação radial:
 
-## Regra Mainhand
+1. EZ Actions verifica cada slot de destino configurado.
+2. Se o alvo já corresponder ao item gravado, ele será ignorado.
+3. Caso contrário, ele encontra a melhor pilha de origem correspondente.
+4. Ele troca itens no slot de destino.
 
-`Mainhand` e o slot de hotbar selecionado no momento da execucao.
+Ele processa slot por slot e permite sucesso parcial.
 
-## Comportamento
+## Regras de correspondência importantes
 
-- Processa slot por slot (sucesso parcial e permitido).
-- Se outra acao de equipar iniciar, a anterior e cancelada.
-- Movimento do jogador continua ativo durante a execucao.
+- A correspondência é baseada na assinatura de snapshot de pilha completa (NBT e metadados), ignorando a contagem.
+- Se existirem várias pilhas correspondentes, ele escolhe aquela com maior contagem.
+
+## Regra principal
+
+`Mainhand` significa o slot da barra de atalho atualmente selecionado no momento do acionamento.
+
+## Comportamento sob pressão
+
+- Se você acionar uma segunda ação de equipar item enquanto uma estiver em execução, a antiga será cancelada e substituída.
+- As entradas de movimento e jogabilidade permanecem ativas enquanto a execução é executada em segundo plano.
+
+## Controles rápidos no editor
+
+- Arrastar LMB do slot de origem para o destino: atribua o item.
+- RMB no slot alvo: atribuição clara.
+- `Refresh Items`: reconstrói a lista de fontes a partir do estado atual do inventário do jogador.
+
+???+ info "Aprofundamento: ordem de execução de slots"
+    A ordem de execução atual é:
+
+1. Capacete
+    2. Peitoral
+    3. Perneiras
+    4. Botas
+    5. De improviso
+    6. Principal
+
+Destinos vazios e correspondências de origem ausentes são ignorados e não tratados como falha grave.

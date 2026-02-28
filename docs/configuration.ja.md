@@ -1,46 +1,73 @@
-﻿# Configuration
+＃ 構成
 
-Menu Editor から `Config` を開きます。
+`Config` ボタンを使用して、メニュー エディタから設定を開きます。
 
-セクション:
+構成 UI には 3 つのセクションがあります。
 
-- General
-- Animations
-- Design
+- 一般
+- アニメーション
+- デザイン
 
-## General
+＃＃ 一般的な
 
-- `Move While Radial Open`
-- `Show Hover Label`
-- `Command Editor Visible Lines`（1-20）
+|設定 |タイプ |範囲/値 |デフォルト |
+|---|---|---|---|
+|ラジアルに開いた状態で移動 |ブール値 |オン/オフ |オン |
+|ホバーラベルを表示 |ブール値 |オン/オフ |オン |
+|コマンド エディターの表示行 |整数 | 1-20 | 5 |
 
-## Animations
+## アニメーション
 
-- `Animations Enabled`
-- `Open/Close Animation`
-- `Hover Animation`
-- `Open Style`: `WIPE`, `FADE`, `NONE`
-- `Direction`: `CW`, `CCW`
-- `Hover Style`: `FILL_SCALE`, `FILL_ONLY`, `SCALE_ONLY`, `NONE`
-- `Hover Grow Percent`: 0.0-0.5
-- `Open/Close Duration`: 0-2000 ms
+|設定 |タイプ |範囲/値 |デフォルト |
+|---|---|---|---|
+|アニメーションが有効 |ブール値 |オン/オフ |オン |
+|開閉アニメーション |ブール値 |オン/オフ |オン |
+|ホバーアニメーション |ブール値 |オン/オフ |オン |
+|オープンスタイル |列挙型 | `WIPE`、`FADE`、`NONE` | `WIPE` |
+|方向 |列挙型 | `CW`、`CCW` | `CW` |
+|ホバースタイル |列挙型 | `FILL_SCALE`、`FILL_ONLY`、`SCALE_ONLY`、`NONE` | `FILL_SCALE` |
+|ホバー成長率 |ダブル | 0.0～0.5 | 0.05 |
+|開閉時間 |整数 (ミリ秒) | 0-2000 | 125 |
 
-## Design
+＃＃ デザイン
 
-- `Deadzone`
-- `Outer Radius`
-- `Ring Thickness`
-- `Scale Start Threshold`
-- `Scale Per Item`
-- `Slice Gap`
-- `Design Style`: `SOLID`, `SEGMENTED`, `OUTLINE`, `GLASS`
-- 色: `Ring/Hover/Border/Text`（ARGB int）
+|設定 |タイプ |範囲/値 |デフォルト |
+|---|---|---|---|
+|デッドゾーン |整数 | 0-90 | 18 |
+|外半径 |整数 | 24-512 | 72 |
+|リングの厚さ |整数 | 6-256 | 28 |
+|スケール開始しきい値 |整数 | 0-128 | 8 |
+|項目ごとのスケール |整数 | 0-100 | 6 |
+|スライスギャップ |整数 (度) | 0-12 | 0 |
+|デザインスタイル |列挙型 | `SOLID`、`SEGMENTED`、`OUTLINE`、`GLASS` | `SOLID` |
+|リングの色 | ARGB 整数 | 32 ビットの符号付き int | `0xAA000000` |
+|ホバーカラー | ARGB 整数 | 32 ビットの符号付き int | `0xFFF20044` |
+|境界線の色 | ARGB 整数 | 32 ビットの符号付き int | `0x66FFFFFF` |
+|テキストの色 | ARGB 整数 | 32 ビットの符号付き int | `0xFFFFFFFF` |
 
-## Preview
+## プレビュー
 
-`Preview` は 1 秒間隔で開閉アニメーションをループ表示します。
+`Preview` は、放射状のプレビュー画面を開き、ループ間に 1 秒の一時停止を入れてアニメーションをループします。
 
-## Save
+これを使用して、コミットする前にビジュアル設定を調整します。
 
-- Save で即時に TOML へ書き込み
-- 保存後は親エディターへ戻る
+## 動作の保存
+
+- 保存すると、値が構成ファイルにすぐに書き込まれます。
+- 保存すると、親エディター画面に戻ります。
+
+## 設定ファイル
+
+- `config/ezactions/general-client.toml`
+- `config/ezactions/anim-client.toml`
+- `config/ezactions/design-client.toml`
+
+???+ 情報「詳細: カラー形式」
+    色は、符号付き 32 ビット ARGB 整数として保存されます。
+
+例：
+
+- `0xAARRGGBB`
+    - アルファ `AA`、次に赤 `RR`、緑 `GG`、青 `BB`
+
+不透明な ARGB 値では、負の 10 進数が正常です。

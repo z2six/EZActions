@@ -1,55 +1,67 @@
-﻿# Hauptmenu-Editor
+# Hauptmenü-Editor-GUI
 
-Der Menu-Editor ist das Kontrollzentrum fuer dein Radialmenu.
+Der Menü-Editor ist Ihr Kontrollzentrum für die Erstellung des Radials.
 
-Oeffne ihn mit dem Keybind `Open editor`.
+Öffnen Sie es mit der Tastenkombination `Open editor`.
 
-## Aufbau
+## Layout
 
-- **Linkes Panel:** Aktionen und Bundle erstellen, bearbeiten, entfernen.
-- **Rechtes Panel:** Liste der aktuellen Seite (Root oder aktuelles Bundle).
-- **Filter oben links:** filtert nach `Title`, `Note` und Aktionstyp.
-- **Unten links:** `Import`, `Export`, `Konfiguration`, `Close`.
+- **Linker Bereich:** Aktionen und Bundles erstellen/bearbeiten/entfernen.
+- **Rechter Bereich:** aktuelle Seitenliste (Root oder aktuelles Bundle).
+- **Filter oben links:** filtert nach Titel, Notiz und Aktionstyptext.
+- **Unten links:** Import/Export, Konfiguration, Schließen.
 
-## Hinzufuegen-Buttons
+## Schaltflächen hinzufügen
 
-- `Tastenaktion hinzufuegen`
-- `Befehl hinzufuegen`
-- `Item-Ausruesten hinzufuegen`
-- `Bundle hinzufuegen`
+- `Add Key Action`
+- `Add Command`
+- `Add Item Equip`
+- `Add Bundle`
 
-## Listen-Interaktion
+## Interaktion auflisten
 
 ### Maus
 
-- **LMB auf Eintrag:** auswaehlen.
-- **LMB Drag:** innerhalb der aktuellen Seite neu anordnen.
-- **Drag auf Bundle-Zeile:** in dieses Bundle verschieben.
-- **Drag auf Back-Zeilen:** nach Parent/Root verschieben.
-- **RMB auf Bundle:** Bundle oeffnen.
+- **LMB auf Element:** auswählen.
+- **LMB-Ziehelement:** innerhalb der aktuellen Seite neu anordnen.
+- **LMB-Element in die Bundle-Zeile ziehen:** Element in dieses Bundle verschieben.
+- **LMB-Element in die hinteren Zeilen ziehen:** Element zum übergeordneten/Stammverzeichnis verschieben.
+- **RMB in der Bundle-Zeile:** Öffnen Sie das Bundle.
 
 ### Tastatur
 
-- `Ctrl + F`: Fokus auf `Filter`.
-- `Enter`: ausgewaehlte Zeile bearbeiten.
-- `Delete` oder `Backspace`: Auswahl loeschen.
-- `Up Arrow`: nach oben.
-- `Down Arrow`: nach unten.
+- `Ctrl + F` fokussiert die Filterbox.
+- `Enter` bearbeitet die ausgewählte Zeile.
+- `Delete` oder `Backspace` entfernt die ausgewählte Zeile.
+- `Up Arrow` verschiebt das ausgewählte Element nach oben.
+- `Down Arrow` verschiebt das ausgewählte Element nach unten.
 
-!!! tip
-    Pfeil-Reorder ist deaktiviert, solange ein Filtertext aktiv ist.
+!!! Tipp
+    Während der Filtertext aktiv ist, ist die Bewegung nach oben/unten per Tastatur deaktiviert, um mehrdeutige Neuordnungen zu vermeiden.
 
-## Zeilentypen
+## Zeilentypen, die Sie sehen werden
 
-- normale Eintragszeilen (Action oder Bundle)
+- Normale Artikelzeilen (Aktionen oder Bundles)
 - Breadcrumb-Zeile (`root/.../bundle`)
 - `Back to root`
 - `Back to <parent>`
 
-## Gesperrte Eintraege (locked)
+## Gesperrte Einträge
 
-`locked`-Eintraege koennen ingame nicht geloescht werden.
+Gesperrte Einträge sind vor Löschvorgängen im Spiel geschützt.
 
-- Nicht per GUI delete.
-- Nicht per lock-aware API remove.
-- Manuell per `config/ezactions/menu.json` weiterhin moeglich.
+- Sie können sie nicht mit GUI-Löschen entfernen.
+– Sie können sie nicht mit API-Remove-Aufrufen entfernen, die die Sperre berücksichtigen.
+– Sie können weiterhin durch manuelles Bearbeiten von `config/ezactions/menu.json` entfernt werden.
+
+## Tipps für eine schnelle Bearbeitung
+
+- Verwenden Sie kurze Titel für klarere radiale Beschriftungen.
+- Fassen Sie gemeinsam genutzte Dienstprogrammaktionen in Bündeln zusammen (für weniger Unordnung).
+- Verwenden Sie das Filterfeld als schnelle Typsuche, wenn Ihr Menü umfangreich wird.
+
+???+ Info „Deep Dive: Drag-and-Drop-Verhalten“
+    - Neuordnung verwendet Einfügungslogik (kein einfacher Austausch).
+    - Durch das Ablegen in ein Bundle wird die untergeordnete Liste dieses Bundles angehängt.
+    - Wenn Sie zum übergeordneten Element/Stammverzeichnis wechseln, bleibt Ihre aktuelle Editoransicht erhalten, anstatt automatisch zu springen.
+    – Alle erfolgreichen Verschiebungs-/Entfernungsvorgänge werden sofort auf der Festplatte gespeichert.

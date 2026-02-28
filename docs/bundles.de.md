@@ -1,33 +1,59 @@
-﻿# Bundle
+# Bündel
 
-Ein `Bundle` ist ein Ordner/Kategorie im Radialbaum.
+Bundles sind Ordner (Kategorien) innerhalb des radialen Baums.
 
-## Bundle-Felder
+Verwenden Sie sie, um Aktionen nach Kontext zu gruppieren: Kampf, Bauen, Nutzen, Rollenspiel usw.
 
-- **Title**
-- **Note** (optional)
-- **Icon**
-- **Hide from main radial**
-- **Enable keybind**
+## Bündelfelder
 
-## Bundle-Keybind
+- **Titel** (wird auch als interne ID verwendet)
+- **Hinweis** (optional)
+- **Symbol**
+- **Vom Hauptradial ausblenden**
+- **Tastenkombination aktivieren**
 
-Bei aktivem `Enable keybind` registriert EZ Actions einen eigenen Keybind fuer das Bundle.
+## Tastenkombinationen bündeln
 
-!!! warning "Neustart erforderlich"
-    Die Registrierung wird erst nach Client-Neustart wirksam.
+Wenn `Enable keybind` aktiviert ist, registriert EZ Actions eine dedizierte Tastenkombination für dieses Bundle.
 
-## Hide from main radial
+!!! Warnung „Neustart erforderlich“
+    Die Bundle-Tastenkombinationsregistrierung wird beim nächsten Client-Neustart angewendet.
 
-Wenn aktiv:
+EZ Actions zeigt eine Client-Nachricht an, wenn ein Neustart erforderlich ist (einschließlich API-erstellter Bundles).
 
-- Bundle wird auf der Root-Seite ausgeblendet.
-- Bundle bleibt im Menumodell erhalten.
-- Bundle ist weiter ueber API oder Bundle-Keybind erreichbar.
+## Vor Hauptradial verstecken
 
-## Gesperrte Bundle (locked)
+Wenn aktiviert:
 
-`locked` schuetzt vor Ingame-Loeschung.
+– Das Bundle ist auf der Root-Radialseite ausgeblendet.
+- Bundle existiert noch im Menümodell.
+– Bundle kann weiterhin über API oder Bundle-Tastenkombination geöffnet werden.
 
-- Nicht per GUI loeschbar.
-- Manuell per JSON weiterhin entfernbar.
+Gut für „erweiterte Seiten“, bei denen das Stammverzeichnis nicht überladen werden soll.
+
+## Verschachtelte Bundles
+
+Bundles können enthalten:
+
+- Schlüsselaktionen
+- Befehlsaktionen
+- Aktionen zum Ausrüsten von Gegenständen
+- weitere Pakete
+
+## Best Practices
+
+- Halten Sie Root klein und mit hoher Priorität.
+- Niederfrequente Aktionen in tiefere Bündel bündeln.
+- Geben Sie den Bundles klare Symbole und Kurznamen.
+
+## Gesperrte Pakete
+
+Ein Bundle kann mit `locked` markiert werden (normalerweise über API oder JSON).
+
+- Löschpfade im Spiel entfernen es nicht.
+– Durch manuelle JSON-Änderungen kann es immer noch entfernt werden.
+
+???+ Info „Deep Dive: Identität und Einzigartigkeit“
+    Der Bundle-Titel wird in Editor-Workflows als Bundle-ID verwendet.
+
+Doppelte Bundle-Namen können zu Mehrdeutigkeiten führen, daher blockiert der Editor das Speichern doppelter Bundle-Titel/-IDs.

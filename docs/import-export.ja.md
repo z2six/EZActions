@@ -1,35 +1,82 @@
-﻿# Import / Export
+# インポートエクスポート
 
-EZ Actions の Import / Export はクリップボードを使用します。
+EZ アクションのインポート/エクスポートはクリップボードを通じて機能します。
 
-## Export
+## ＃＃ 輸出
 
-Menu Editor で `Export` をクリック。
+メニュー エディタで、`Export` をクリックします。
 
-結果:
+結果：
 
-- Root 全体を JSON 化
-- JSON をクリップボードへコピー
+- 現在の完全なルート ツリーは JSON にシリアル化されます。
+- JSON がクリップボードにコピーされます。
 
-## Import
+## ＃＃ 輸入
 
-Menu Editor で `Import` をクリック。
+メニュー エディタで、`Import` をクリックします。
 
-結果:
+結果：
 
-- クリップボード JSON を parse / validate
-- 成功時に対象パスへ適用
+- クリップボードの JSON が解析され、検証されます。
+- 成功すると、インポートされたエントリはインポート パスごとに追加/置換されます。
 
-## よくあるエラー
+## 一般的なエラー メッセージ
 
-- Clipboard is empty
-- Clipboard is not JSON
-- Root JSON is not array
-- Entry is not object / invalid
+- クリップボードが空です
+- クリップボードは JSON ではありません
+- ルート JSON が配列ではありません
+- エントリはオブジェクトではありません/無効です
 
-## おすすめ手順
+## 実践的なワークフロー
 
-1. まずバックアップを Export
-2. JSON を編集
-3. Import
-4. 問題があればバックアップを再 Import
+1. 現在のメニューをバックアップとしてテキスト ファイルにエクスポートします。
+2. JSON で編集をテストします。
+3. インポートします。
+4. 必要に応じて、以前のバックアップをインポートしてロールバックします。
+
+## JSON 形状
+
+トップレベルでは、メニュー項目の配列 (または一部の API パスでは単一項目) がサポートされます。
+
+各メニュー項目は次のいずれかである必要があります。
+
+- `action` オブジェクトを含む **アクション** アイテム
+- `children` 配列を含む **バンドル** アイテム
+
+### 最小限のアクションの例
+
+```json
+{
+  "id": "act_123",
+  "title": "Inventory",
+  "icon": "minecraft:chest",
+  "action": {
+    "type": "KEY",
+    "name": "key.inventory",
+    "toggle": false,
+    "mode": "AUTO"
+  }
+}
+```
+
+### Minimal Bundle Example
+
+```json
+{
+  "id": "bundle_abc",
+  "title": "Utilities",
+  "icon": "minecraft:shulker_box",
+  "hideFromMainRadial": false,
+  "bundleKeybindEnabled": true,
+  "locked": false,
+  "children": []
+}
+```
+
+???+ info "Deep dive: schema details"
+    - `title` and `note` accept plain string or text component JSON.
+    - `locked` is optional; defaults false.
+    - `action.type` currently supports `KEY`, `COMMAND`, `ITEM_EQUIP`.
+    - `KEY` fields: `name`, `toggle`, `mode`.
+    - `COMMAND` fields: `command`, `delayTicks`, `cycleCommands`.
+    - `ITEM_EQUIP` fields: `slots` map with stored item snapshots.

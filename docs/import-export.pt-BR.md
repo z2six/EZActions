@@ -1,44 +1,82 @@
-﻿# Importar e exportar
+# Importar Exportar
 
-`Import` e `Export` no EZ Actions usam a area de transferencia.
+A importação/exportação do EZ Actions funciona através da sua área de transferência.
 
 ## Exportar
 
-No Menu Editor, clique em `Export`.
+No Editor de Menu, clique em `Export`.
 
 Resultado:
 
-- A arvore root completa vira JSON.
-- JSON e copiado para o clipboard.
+- A árvore raiz completa atual é serializada para JSON.
+- JSON é copiado para a área de transferência.
 
 ## Importar
 
-No Menu Editor, clique em `Import`.
+No Editor de Menu, clique em `Import`.
 
 Resultado:
 
-- JSON do clipboard e parseado e validado.
-- Se valido, aplica na rota alvo.
+- O JSON da área de transferência é analisado e validado.
+- Em caso de sucesso, as entradas importadas são adicionadas/substituídas por caminho de importação.
 
-## Erros comuns
+## Mensagens de erro comuns
 
-- Clipboard vazio
-- Clipboard nao e JSON
-- Root JSON nao e array
-- Entry nao e objeto ou e invalida
+- A área de transferência está vazia
+- A área de transferência não é JSON
+- Root JSON não é array
+- A entrada não é objeto/inválida
 
-## Fluxo recomendado
+## Fluxo de trabalho prático
 
-1. Exporte um backup.
-2. Edite o JSON.
-3. Importe.
-4. Se der ruim, reimporte o backup.
+1. Exporte o menu atual para um arquivo de texto como backup.
+2. Teste as edições em JSON.
+3. Importar.
+4. Se necessário, reverta importando o backup anterior.
 
-## Shape JSON
+## Forma JSON
 
-Cada item precisa ter:
+O nível superior oferece suporte a uma variedade de itens de menu (ou item único em alguns caminhos de API).
 
-- `action` (acao), ou
-- `children` (pacote)
+Cada item do menu deve ser:
 
-Nao use ambos no mesmo objeto.
+- um item de **ação** com o objeto `action`
+- um item **bundle** com matriz `children`
+
+### Exemplo de ação mínima
+
+```json
+{
+  "id": "act_123",
+  "title": "Inventory",
+  "icon": "minecraft:chest",
+  "action": {
+    "type": "KEY",
+    "name": "key.inventory",
+    "toggle": false,
+    "mode": "AUTO"
+  }
+}
+```
+
+### Minimal Bundle Example
+
+```json
+{
+  "id": "bundle_abc",
+  "title": "Utilities",
+  "icon": "minecraft:shulker_box",
+  "hideFromMainRadial": false,
+  "bundleKeybindEnabled": true,
+  "locked": false,
+  "children": []
+}
+```
+
+???+ info "Deep dive: schema details"
+    - `title` and `note` accept plain string or text component JSON.
+    - `locked` is optional; defaults false.
+    - `action.type` currently supports `KEY`, `COMMAND`, `ITEM_EQUIP`.
+    - `KEY` fields: `name`, `toggle`, `mode`.
+    - `COMMAND` fields: `command`, `delayTicks`, `cycleCommands`.
+    - `ITEM_EQUIP` fields: `slots` map with stored item snapshots.

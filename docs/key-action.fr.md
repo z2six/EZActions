@@ -1,38 +1,49 @@
-﻿# Action de touche
+# Action clé
 
-`Action de touche` declenche un keybind existant (vanilla ou modde) depuis le radial.
+Utilisez une action clé pour déclencher un raccourci clavier existant (vanille ou moddé) à partir du radial.
 
 ## Champs
 
-- **Title**
-- **Note**
-- **Mapping Name**
-- **Delivery** : `AUTO`, `INPUT`, `TICK`
-- **Toggle**
-- **Icon**
+- **Titre** : ce que vous voyez dans l'éditeur/étiquette radiale.
+- **Remarque** : texte d'aide facultatif.
+- **Nom du mappage** : identifiant ou étiquette du mappage de clé.
+- **Livraison** : `AUTO`, `INPUT` ou `TICK`.
+- **Toggle** : basculez l'état de la touche au lieu d'appuyer.
+- **Icône** : cliquez sur la zone d'icône pour ouvrir le sélecteur d'icônes.
 
-## Procedure recommandee
+## Configuration recommandée
 
-1. Cliquer `Pick from Keybinds`.
-2. Choisir le binding dans la liste.
-3. Garder `AUTO` par defaut.
-4. Sauvegarder.
+1. Cliquez sur `Pick from Keybinds`.
+2. Sélectionnez la reliure dans le sélecteur (plus sûr que de taper à la main).
+3. Continuez la livraison sur `AUTO` sauf si vous avez une raison spécifique.
+4. Enregistrez.
 
-## Modes Delivery
+## Modes de livraison
 
-| Mode | Fonction | Usage |
+| Mode | Ce qu'il fait | Quand utiliser |
 |---|---|---|
-| `AUTO` | Choisit automatiquement la meilleure methode | Defaut |
-| `INPUT` | Injection press/release via input pipeline | Si `AUTO` ne repond pas |
-| `TICK` | Controle etat de touche par tick | Fallback |
+| `AUTO` | Sélectionne automatiquement le meilleur chemin | Par défaut pour presque tout le monde |
+| `INPUT` | Injecte la pression/relâchement de la touche via le pipeline d'entrée | Si une liaison ne répond pas dans `AUTO` |
+| `TICK` | Définit la touche vers le bas/vers le haut via les mises à jour de l'état des clés | Solution de secours utile pour les clés difficiles à injecter |
 
-## Toggle
+## Basculer
 
-- `OFF` : un tap par utilisation.
-- `ON` : alterne down/up a chaque utilisation.
+- `OFF` : un robinet par utilisation radiale.
+- `ON` : retourne la clé vers le bas/vers le haut à chaque utilisation.
 
-## Problemes frequents
+Utile pour des actions telles que les bascules de style sprint/sneak, en fonction du comportement de la combinaison de touches cible.
 
-- **Rien ne se passe :** verifier mapping id, rechoisir via picker.
-- **Mauvaise touche :** eviter saisie manuelle, utiliser picker.
-- **SP ok / serveur non :** restrictions ou permissions serveur.
+## Problèmes courants
+
+- **Rien ne se passe :** vérifiez l'identifiant de mappage ou choisissez à nouveau dans la liste des raccourcis clavier.
+- **Déclencheurs de raccourcis clavier incorrects :** votre nom saisi correspond à une autre étiquette de mappage ; utiliser le sélecteur.
+- **Fonctionne en mode solo mais pas sur serveur :** l'action cible peut être restreinte au serveur.
+
+???+ info "Plongée approfondie : comment fonctionne la livraison des clés"
+    En interne, EZ Actions résout les noms de mappage en :
+
+1. correspondance exacte des clés de traduction
+    2. correspondance exacte des étiquettes localisées
+    3. La solution de secours contient une correspondance
+
+Pour les touches requises par le modificateur (Ctrl/Shift/Alt), il utilise une logique d'injection supplémentaire. `AUTO` peut changer de stratégie selon qu'une touche est liée, possède un scancode ou nécessite des modificateurs.

@@ -1,43 +1,73 @@
-﻿# Accion de equipar objetos
+# Acción de equipamiento de artículo
 
-`Accion de equipar objetos` guarda un snapshot de equipo y vuelve a equipar items coincidentes desde inventario.
+Item Equip te permite guardar una instantánea del equipo y volver a equipar elementos coincidentes de tu inventario.
 
-## Slots objetivo
+## Ranuras de destino
 
-- Mainhand
-- Offhand
-- Helmet
-- Chestplate
-- Leggings
-- Boots
+Puedes asignar cualquiera de estos:
 
-Si un slot queda vacio en el editor, se omite al ejecutar.
+- Mano principal
+- De improviso
+- Casco
+- Peto
+- Polainas
+- Botas
 
-## Como crear
+Si un espacio se deja vacío en el editor, EZ Actions lo omite durante la ejecución.
 
-1. `Agregar equipar objetos`
-2. Define `Title`, `Note`, `Icon`
-3. Arrastra items desde `Source Items` a `Equip Targets`
-4. Guarda
+## Cómo crear uno
 
-## Source Items incluye
+1. Haga clic en `Add Item Equip`.
+2. Establezca título/nota/icono.
+3. Arrastre elementos desde la cuadrícula de origen a las ranuras de destino.
+4. Guardar.
 
-- offhand actual
+### La cuadrícula de origen incluye
+
+- elemento improvisado actual
 - armadura equipada
 - inventario principal
-- hotbar
+- barra de acceso rápido
 
-## Reglas de matching
+## Durante la ejecución
 
-- Coincidencia por snapshot completo (NBT y metadata), ignorando count.
-- Si hay multiples coincidencias, usa la pila con mayor cantidad.
+Cuando activas la acción desde radial:
 
-## Regla Mainhand
+1. EZ Actions verifica cada ranura de destino configurada.
+2. Si el objetivo ya coincide con el elemento grabado, se omite.
+3. Si no, encuentra la pila fuente que mejor coincida.
+4. Intercambia elementos en la ranura de destino.
 
-`Mainhand` significa el slot de hotbar seleccionado al momento de ejecutar.
+Procesa ranura por ranura y permite un éxito parcial.
 
-## Comportamiento en ejecucion
+## Reglas de coincidencia importantes
 
-- Se procesa slot por slot (permite exito parcial).
-- Si lanzas otra accion de equipar mientras una sigue activa, la anterior se cancela.
-- El movimiento del jugador sigue activo durante la ejecucion.
+- La coincidencia se basa en la firma de instantáneas de pila completa (NBT y metadatos), ignorando el recuento.
+- Si existen varias pilas coincidentes, elige la que tiene el mayor número.
+
+## Regla principal
+
+`Mainhand` significa el espacio de la barra de acceso rápido seleccionado actualmente en el momento de activación.
+
+## Comportamiento bajo presión
+
+- Si activas una segunda acción de Equipar artículo mientras una está en ejecución, la anterior se cancela y se reemplaza.
+- Las entradas de movimiento y juego permanecen activas mientras la ejecución se ejecuta en segundo plano.
+
+## Controles rápidos en el editor
+
+- Arrastre LMB desde la ranura de origen a la de destino: asignar elemento.
+- RMB en la ranura objetivo: asignación clara.
+- `Refresh Items`: reconstruir la lista de fuentes a partir del estado actual del inventario del jugador.
+
+???+ info "Análisis profundo: orden de ejecución de las tragamonedas"
+    El orden de ejecución actual es:
+
+1. Casco
+    2. Pechera
+    3. Polainas
+    4. Botas
+    5. De improviso
+    6. mano principal
+
+Los destinos vacíos y las coincidencias de fuentes faltantes se omiten y no se tratan como fallas graves.

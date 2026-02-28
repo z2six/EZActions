@@ -1,43 +1,56 @@
-﻿# Befehlsaktion
+# Befehlsaktion
 
-`Befehlsaktion` sendet Befehle aus dem Radialmenu.
+Verwenden Sie eine Befehlsaktion, um Befehle vom Radial zu senden.
 
 ## Felder
 
-- **Title**
-- **Note**
-- **Command** (mehrzeilig)
-- **Multi-command delay (ticks)**
-- **Cycle commands (one per use)**
-- **Icon**
+- **Titel**
+- **Hinweis**
+- **Befehl** (mehrzeilig)
+- **Verzögerung mehrerer Befehle (Ticks)**
+- **Zyklusbefehle (einer pro Verwendung)**
+- **Symbol**
 
-## Regeln fuer das Command-Feld
+## Befehlsfeldregeln
 
 - Eine Zeile = ein Befehl.
-- Fuehrendes `/` ist optional.
-- Leere Zeilen werden ignoriert.
+- Das führende `/` ist optional (EZ Actions entfernt es vor dem Senden).
+- Leerzeilen werden ignoriert.
 
-## Delay-Verhalten
+## Verzögerungsverhalten
 
-`Multi-command delay (ticks)` steuert den Abstand zwischen Zeilen im Nicht-Cycle-Modus.
+`Multi-command delay (ticks)` steuert den Abstand zwischen Befehlszeilen, wenn nicht gewechselt wird.
 
-- `0`: sofort senden.
-- `>0`: zeilenweise mit Delay.
+- `0`: Zeilen sofort senden.
+- `>0`: Warteschlange Zeile für Zeile mit dieser Verzögerung.
 
-## Cycle commands
+## Zyklusbefehle
 
-Wenn aktiv, sendet jede Nutzung genau eine Zeile und rotiert zur naechsten.
+Wenn aktiviert, sendet jede radiale Verwendung genau eine Zeile und rotiert zur nächsten.
+
+Beispiel:
 
 ```text
 /time set day
 /time set night
 ```
 
-Use 1 -> day  
-Use 2 -> night  
-Use 3 -> day
+Use #1 -> day  
+Use #2 -> night  
+Use #3 -> day
 
-## Hinweise
+## Praktische Anwendungsfälle
 
-- Dispatch ist clientseitig, Serverrechte gelten trotzdem.
-- Eine neue Sequenz ersetzt eine laufende Sequenz.
+- Schnelle Dienstprogrammbefehle (`/home`, `/spawn`, `/warp mine`)
+- Rollenspiel schaltet um (`/hat`, `/nick`)
+- Admin-Workflows sind zeilenübergreifend aufgeteilt
+
+## Notizen
+
+– Dies ist ein clientseitiger Versand: Serverberechtigungen gelten weiterhin.
+– Wenn eine neue Befehlssequenz beginnt, wird die vorherige in der Warteschlange befindliche Sequenz ersetzt.
+
+???+ Info „Deep Dive: Sequenzierungsmodell“
+    – Nicht-zyklische mehrzeilige Befehle verwenden einen Client-Tick-Sequenzer.
+    - Der Wechselmodus speichert einen internen Cursor in der Aktionsinstanz.
+    - Die Modi „Cycling“ und „Immediate“ brechen Flugsequenzen vor dem Versand ab.

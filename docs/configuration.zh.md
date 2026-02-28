@@ -1,73 +1,73 @@
-﻿# 配置
+# ＃ 配置
 
-在菜单编辑器点击 `Config` 打开配置界面。
+使用`Config` 按钮从菜单编辑器打开配置。
 
-配置界面有三个分区：
+配置 UI 分为三个部分：
 
-- General
-- Animations
-- Design
+- 一般
+- 动画
+- 设计
 
-## General
+## ＃＃ 一般的
 
-| 设置 | 类型 | 范围 / 值 | 默认 |
+|设置|类型 |范围/值 |默认|
 |---|---|---|---|
-| Move While Radial Open | 布尔 | ON/OFF | ON |
-| Show Hover Label | 布尔 | ON/OFF | ON |
-| Command Editor Visible Lines | 整数 | 1-20 | 5 |
+|径向打开时移动 |布尔 |开/关|开 |
+|显示悬停标签 |布尔 |开/关|开 |
+|命令编辑器可见线 |整数 | 1-20 | 1-20 5 |
 
-## Animations
+## 动画
 
-| 设置 | 类型 | 范围 / 值 | 默认 |
+|设置|类型 |范围/值 |默认|
 |---|---|---|---|
-| Animations Enabled | 布尔 | ON/OFF | ON |
-| Open/Close Animation | 布尔 | ON/OFF | ON |
-| Hover Animation | 布尔 | ON/OFF | ON |
-| Open Style | 枚举 | `WIPE`, `FADE`, `NONE` | `WIPE` |
-| Direction | 枚举 | `CW`, `CCW` | `CW` |
-| Hover Style | 枚举 | `FILL_SCALE`, `FILL_ONLY`, `SCALE_ONLY`, `NONE` | `FILL_SCALE` |
-| Hover Grow Percent | 小数 | 0.0-0.5 | 0.05 |
-| Open/Close Duration | 整数(ms) | 0-2000 | 125 |
+|启用动画 |布尔 |开/关|开 |
+|打开/关闭动画 |布尔 |开/关|开 |
+|悬停动画|布尔 |开/关|开 |
+|开放式 |枚举 | `WIPE`、`FADE`、`NONE` | `WIPE` |
+|方向 |枚举 | `CW`、`CCW` | `CW` |
+|悬停风格 |枚举 | `FILL_SCALE`、`FILL_ONLY`、`SCALE_ONLY`、`NONE` | `FILL_SCALE` |
+|悬停增长百分比|双| 0.0-0.5 | 0.05 | 0.05
+|打开/关闭持续时间 |整数（毫秒）| 0-2000 | 125 | 125
 
-## Design
+## ＃＃ 设计
 
-| 设置 | 类型 | 范围 / 值 | 默认 |
+|设置|类型 |范围/值|默认|
 |---|---|---|---|
-| Deadzone | 整数 | 0-90 | 18 |
-| Outer Radius | 整数 | 24-512 | 72 |
-| Ring Thickness | 整数 | 6-256 | 28 |
-| Scale Start Threshold | 整数 | 0-128 | 8 |
-| Scale Per Item | 整数 | 0-100 | 6 |
-| Slice Gap | 整数(度) | 0-12 | 0 |
-| Design Style | 枚举 | `SOLID`, `SEGMENTED`, `OUTLINE`, `GLASS` | `SOLID` |
-| Ring Color | ARGB 整数 | 32 位有符号整数 | `0xAA000000` |
-| Hover Color | ARGB 整数 | 32 位有符号整数 | `0xFFF20044` |
-| Border Color | ARGB 整数 | 32 位有符号整数 | `0x66FFFFFF` |
-| Text Color | ARGB 整数 | 32 位有符号整数 | `0xFFFFFFFF` |
+|死区 |整数 | 0-90 | 18 | 18
+|外半径|整数 | 24-512 | 24-512 72 | 72
+|环厚度|整数 | 6-256 | 6-256 28 | 28
+|规模开始阈值|整数 | 0-128 | 8 |
+|每个项目的规模|整数 | 0-100 | 6 |
+|切片间隙|整数（度）| 0-12 | 0 |
+|设计风格|枚举 | `SOLID`、`SEGMENTED`、`OUTLINE`、`GLASS` | `SOLID` |
+|戒指颜色 | ARGB 整数 | 32 位有符号整数 | `0xAA000000` |
+|悬停颜色 | ARGB 整数 | 32 位有符号整数 | `0xFFF20044` |
+|边框颜色| ARGB 整数 | 32 位有符号整数 | `0x66FFFFFF` |
+|文字颜色 | ARGB 整数 | 32 位有符号整数 | `0xFFFFFFFF` |
 
-## Preview
+## ＃＃ 预览
 
-`Preview` 会打开径向预览界面，并以 1 秒间隔循环播放开关动画。
+`Preview` 打开径向预览屏幕并循环播放动画，循环之间有 1 秒的暂停。
 
-可以先调到满意再保存。
+在提交之前使用它来调整视觉设置。
 
 ## 保存行为
 
-- 点击 Save 会立即写入配置文件。
-- 保存后界面会返回父编辑器。
+- 保存立即将值写入配置文件。
+- 保存时，屏幕返回到父编辑器屏幕。
 
-## 配置文件位置
+## 配置文件
 
-- `config/ezactions/general-client.toml`
-- `config/ezactions/anim-client.toml`
-- `config/ezactions/design-client.toml`
+-@@代码0@@
+-@@代码1@@
+-@@代码2@@
 
-???+ info "深入说明：颜色格式"
-    颜色以 32 位有符号 ARGB 整数存储。
+???+ 信息“深入探讨：颜色格式”
+    颜色存储为带符号的 32 位 ARGB 整数。
 
-    示例：
+例子：
 
-    - `0xAARRGGBB`
-    - `AA` 是透明度，然后是 `RR`、`GG`、`BB`
+-@@代码0@@
+    - 阿尔法`AA`，然后是红色`RR`、绿色`GG`、蓝色`BB`
 
-    对于不透明颜色，十进制显示为负数是正常现象。
+对于不透明的 ARGB 值，负十进制数是正常的。

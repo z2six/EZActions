@@ -1,44 +1,82 @@
-﻿# Import Export
+# Импорт Экспорт
 
-Import/Export в EZ Actions работает через clipboard.
+Импорт/экспорт EZ Actions работает через буфер обмена.
 
-## Export
+## Экспорт
 
-В Menu Editor нажми `Export`.
-
-Результат:
-
-- Полное root-дерево сериализуется в JSON.
-- JSON копируется в clipboard.
-
-## Import
-
-В Menu Editor нажми `Import`.
+В Редакторе меню нажмите `Export`.
 
 Результат:
 
-- JSON из clipboard парсится и валидируется.
-- При успехе элементы добавляются/заменяются по пути импорта.
+— Текущее полное корневое дерево сериализуется в JSON.
+- JSON копируется в буфер обмена.
 
-## Частые ошибки
+## Импорт
 
-- Clipboard is empty
-- Clipboard is not JSON
-- Root JSON is not array
-- Entry is not object / invalid
+В Редакторе меню нажмите `Import`.
 
-## Практичный workflow
+Результат:
 
-1. Экспортируй текущее меню в файл (бэкап).
-2. Проверь/измени JSON.
-3. Импортируй.
-4. При необходимости откатись предыдущим экспортом.
+- JSON буфера обмена анализируется и проверяется.
+- В случае успеха импортированные записи добавляются/заменяются для каждого пути импорта.
 
-## JSON shape
+## Распространенные сообщения об ошибках
 
-Верхний уровень: массив элементов меню (в некоторых API-путях допускается single item).
+- Буфер обмена пуст
+- Буфер обмена не JSON
+- Корневой JSON не является массивом.
+- Запись не является объектом/недействительна
 
-Элемент должен быть либо:
+## Практический рабочий процесс
 
-- action item с `action`
-- bundle item с `children`
+1. Экспортируйте текущее меню в текстовый файл в качестве резервной копии.
+2. Тестовые правки в JSON.
+3. Импорт.
+4. При необходимости выполните откат, импортировав предыдущую резервную копию.
+
+## Форма JSON
+
+Верхний уровень поддерживает массив пунктов меню (или один элемент в некоторых путях API).
+
+Каждый пункт меню должен быть:
+
+- элемент **action** с объектом `action`
+- элемент **bundle** с массивом `children`
+
+### Пример минимального действия
+
+```json
+{
+  "id": "act_123",
+  "title": "Inventory",
+  "icon": "minecraft:chest",
+  "action": {
+    "type": "KEY",
+    "name": "key.inventory",
+    "toggle": false,
+    "mode": "AUTO"
+  }
+}
+```
+
+### Minimal Bundle Example
+
+```json
+{
+  "id": "bundle_abc",
+  "title": "Utilities",
+  "icon": "minecraft:shulker_box",
+  "hideFromMainRadial": false,
+  "bundleKeybindEnabled": true,
+  "locked": false,
+  "children": []
+}
+```
+
+???+ info "Deep dive: schema details"
+    - `title` and `note` accept plain string or text component JSON.
+    - `locked` is optional; defaults false.
+    - `action.type` currently supports `KEY`, `COMMAND`, `ITEM_EQUIP`.
+    - `KEY` fields: `name`, `toggle`, `mode`.
+    - `COMMAND` fields: `command`, `delayTicks`, `cycleCommands`.
+    - `ITEM_EQUIP` fields: `slots` map with stored item snapshots.

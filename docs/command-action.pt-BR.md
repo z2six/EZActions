@@ -1,43 +1,56 @@
-﻿# Acao de comando
+# Ação de comando
 
-`Acao de comando` envia comandos pelo radial.
+Use uma ação de comando para enviar comandos do radial.
 
 ## Campos
 
-- **Title**
-- **Note**
-- **Command** (multilinha)
-- **Multi-command delay (ticks)**
-- **Cycle commands (one per use)**
-- **Icon**
+- **Título**
+- **Nota**
+- **Comando** (multilinha)
+- **Atraso multi-comando (tiques)**
+- **Comandos de ciclo (um por uso)**
+- **Ícone**
 
-## Regras do campo Command
+## Regras da caixa de comando
 
 - Uma linha = um comando.
-- Prefixo `/` e opcional.
-- Linhas vazias sao ignoradas.
+- Inicializar `/` é opcional (EZ Actions remove-o antes de enviar).
+- Linhas vazias são ignoradas.
 
-## Delay
+## Comportamento de atraso
 
-`Multi-command delay (ticks)` controla espacamento entre linhas no modo nao ciclico.
+`Multi-command delay (ticks)` controla o espaçamento entre as linhas de comando quando não está em ciclo.
 
-- `0`: envia tudo na hora.
-- `>0`: envia linha por linha com delay.
+- `0`: envia linhas imediatamente.
+- `>0`: fila linha por linha com esse atraso.
 
-## Cycle commands
+## Comandos de Ciclo
 
-Se ativado, cada uso envia uma linha e avanca para a proxima.
+Se ativado, cada uso radial envia exatamente uma linha e gira para a próxima.
+
+Exemplo:
 
 ```text
 /time set day
 /time set night
 ```
 
-Uso 1 -> day  
-Uso 2 -> night  
-Uso 3 -> day
+Use #1 -> day  
+Use #2 -> night  
+Use #3 -> day
+
+## Casos de uso prático
+
+- Comandos utilitários rápidos (`/home`, `/spawn`, `/warp mine`)
+- Alternadores de roleplay (`/hat`, `/nick`)
+- Fluxos de trabalho administrativos divididos entre linhas
 
 ## Notas
 
-- O envio e client-side, mas o server ainda valida permissao.
-- Nova sequencia substitui a fila anterior.
+- Este é o envio do lado do cliente: as permissões do servidor ainda se aplicam.
+- Se uma nova sequência de comandos for iniciada, a sequência anterior na fila será substituída.
+
+???+ info "Aprofundamento: modelo de sequenciamento"
+    - Comandos multilinhas sem ciclo usam um sequenciador de ticks do cliente.
+    - O modo de ciclismo armazena um cursor interno na instância da ação.
+    - Os modos cíclico e imediato cancelam as sequências em voo antes do despacho.

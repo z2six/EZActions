@@ -1,46 +1,73 @@
-﻿# Konfiguration
+# Konfiguration
 
-`Konfiguration` im Menu-Editor oeffnen.
+Öffnen Sie die Konfiguration im Menü-Editor mit der Schaltfläche `Config`.
 
-Bereiche:
+Die Konfigurationsoberfläche besteht aus drei Abschnitten:
 
-- General
-- Animations
+- Allgemein
+- Animationen
 - Design
 
-## General
+## Allgemein
 
-- `Move While Radial Open`
-- `Show Hover Label`
-- `Command Editor Visible Lines` (1-20)
+| Einstellung | Geben Sie | ein Bereich/Werte | Standard |
+|---|---|---|---|
+| Bewegen bei radialer Öffnung | boolescher Wert | EIN/AUS | EIN |
+| Hover-Label anzeigen | boolescher Wert | EIN/AUS | EIN |
+| Sichtbare Linien des Befehlseditors | int | 1-20 | 5 |
 
-## Animations
+## Animationen
 
-- `Animations Enabled`
-- `Open/Close Animation`
-- `Hover Animation`
-- `Open Style`: `WIPE`, `FADE`, `NONE`
-- `Direction`: `CW`, `CCW`
-- `Hover Style`: `FILL_SCALE`, `FILL_ONLY`, `SCALE_ONLY`, `NONE`
-- `Hover Grow Percent`: 0.0-0.5
-- `Open/Close Duration`: 0-2000 ms
+| Einstellung | Geben Sie | ein Bereich/Werte | Standard |
+|---|---|---|---|
+| Animationen aktiviert | boolescher Wert | EIN/AUS | EIN |
+| Animation öffnen/schließen | boolescher Wert | EIN/AUS | EIN |
+| Hover-Animation | boolescher Wert | EIN/AUS | EIN |
+| Offener Stil | Aufzählung | `WIPE`, `FADE`, `NONE` | `WIPE` |
+| Richtung | Aufzählung | `CW`, `CCW` | `CW` |
+| Hover-Stil | Aufzählung | `FILL_SCALE`, `FILL_ONLY`, `SCALE_ONLY`, `NONE` | `FILL_SCALE` |
+| Hover-Wachstumsprozentsatz | doppelt | 0,0-0,5 | 0,05 |
+| Öffnungs-/Schließdauer | int (ms) | 0-2000 | 125 |
 
 ## Design
 
-- `Deadzone`
-- `Outer Radius`
-- `Ring Thickness`
-- `Scale Start Threshold`
-- `Scale Per Item`
-- `Slice Gap`
-- `Design Style`: `SOLID`, `SEGMENTED`, `OUTLINE`, `GLASS`
-- Farben (`Ring/Hover/Border/Text`) als ARGB int
+| Einstellung | Geben Sie | ein Bereich/Werte | Standard |
+|---|---|---|---|
+| Deadzone | int | 0-90 | 18 |
+| Außenradius | int | 24-512 | 72 |
+| Ringstärke | int | 6-256 | 28 |
+| Skalierungsstartschwelle | int | 0-128 | 8 |
+| Skalierung pro Artikel | int | 0-100 | 6 |
+| Slice-Lücke | int (Grad) | 0-12 | 0 |
+| Designstil | Aufzählung | `SOLID`, `SEGMENTED`, `OUTLINE`, `GLASS` | `SOLID` |
+| Ringfarbe | ARGB int | 32-Bit-Int mit Vorzeichen | `0xAA000000` |
+| Hover-Farbe | ARGB int | 32-Bit-Int mit Vorzeichen | `0xFFF20044` |
+| Randfarbe | ARGB int | 32-Bit-Int mit Vorzeichen | `0x66FFFFFF` |
+| Textfarbe | ARGB int | 32-Bit-Int mit Vorzeichen | `0xFFFFFFFF` |
 
-## Preview
+## Vorschau
 
-`Preview` zeigt einen wiederholten Radial-Vorschauzyklus mit 1s Pause.
+`Preview` öffnet einen radialen Vorschaubildschirm und wiederholt die Animation mit einer Pause von 1 Sekunde zwischen den Schleifen.
 
-## Save
+Verwenden Sie dies, um die visuellen Einstellungen vor dem Commit zu optimieren.
 
-- Speichert sofort in TOML-Dateien.
-- Kehrt danach zum Parent-Editor zurueck.
+## Verhalten speichern
+
+- Speichern schreibt Werte sofort in Konfigurationsdateien.
+- Beim Speichern kehrt der Bildschirm zum übergeordneten Editor-Bildschirm zurück.
+
+## Konfigurationsdateien
+
+- `config/ezactions/general-client.toml`
+- `config/ezactions/anim-client.toml`
+- `config/ezactions/design-client.toml`
+
+???+ Info „Deep Dive: Farbformat“
+    Farben werden als signierte 32-Bit-ARGB-Ints gespeichert.
+
+Beispiel:
+
+- `0xAARRGGBB`
+    - Alpha `AA`, dann Rot `RR`, Grün `GG`, Blau `BB`
+
+Negative Dezimalzahlen sind für undurchsichtige ARGB-Werte normal.
