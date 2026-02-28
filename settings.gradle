@@ -47,5 +47,4 @@ plugins {
 rootProject.name = 'EZ Actions'
 include('common')
 include('fabric')
-include('neoforge')
 include('forge')
