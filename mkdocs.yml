@@ -10,7 +10,6 @@ theme:
     - navigation.tabs
     - navigation.sections
     - navigation.top
-    - navigation.instant
     - toc.follow
     - search.suggest
     - search.highlight
