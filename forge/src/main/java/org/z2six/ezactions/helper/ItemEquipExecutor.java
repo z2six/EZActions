@@ -272,13 +272,6 @@ public final class ItemEquipExecutor {
                 }
             } catch (Throwable ignored) {}
 
-            // Last-resort fallback for legacy wrappers: same item id.
-            try {
-                if (isLegacyWrapper(desired)) {
-                    return ItemStackSnapshot.itemId(stack).equals(desired.itemId());
-                }
-            } catch (Throwable ignored) {}
-
             return false;
         } catch (Throwable t) {
             return false;
@@ -304,22 +297,6 @@ public final class ItemEquipExecutor {
                 t.remove("Damage");
             }
         } catch (Throwable ignored) {}
-    }
-
-    private static boolean isLegacyWrapper(ClickActionItemEquip.StoredItem desired) {
-        if (desired == null) return false;
-        try {
-            String sig = desired.signatureNoCount();
-            if (sig != null && (sig.contains("\"itemId\"") || sig.contains("\"nbt\""))) {
-                return true;
-            }
-        } catch (Throwable ignored) {}
-        try {
-            JsonObject encoded = desired.encodedStack();
-            return encoded != null && (encoded.has("nbt") || encoded.has("itemId"));
-        } catch (Throwable ignored) {
-            return false;
-        }
     }
 
     private static ItemStack decodeStoredStack(ClickActionItemEquip.StoredItem desired) {
