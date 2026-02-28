@@ -30,10 +30,14 @@ public final class DesignClientConfig {
     public static final ModConfigSpec.IntValue ringThickness;
     public static final ModConfigSpec.IntValue scaleStartThreshold;
     public static final ModConfigSpec.IntValue scalePerItem;
+    public static final ModConfigSpec.ConfigValue<String> designStyle;
+    public static final ModConfigSpec.IntValue sliceGapDeg;
 
     // Colors as ARGB ints (signed 32-bit). Use full int range.
     public static final ModConfigSpec.IntValue ringColor;
     public static final ModConfigSpec.IntValue hoverColor;
+    public static final ModConfigSpec.IntValue borderColor;
+    public static final ModConfigSpec.IntValue textColor;
 
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
@@ -48,12 +52,25 @@ public final class DesignClientConfig {
                 .defineInRange("scaleStartThreshold", 8, 0, 128);
         scalePerItem        = b.comment("Outer-radius increment per extra item above threshold (pixels).")
                 .defineInRange("scalePerItem", 6, 0, 100);
+        designStyle         = b.comment("Design style: SOLID, SEGMENTED, OUTLINE, GLASS.")
+                .define("designStyle", "SOLID", o -> {
+                    if (!(o instanceof String s)) return false;
+                    String up = s.trim().toUpperCase(java.util.Locale.ROOT);
+                    return "SOLID".equals(up) || "SEGMENTED".equals(up)
+                            || "OUTLINE".equals(up) || "GLASS".equals(up);
+                });
+        sliceGapDeg         = b.comment("Gap between slices in degrees (0..12).")
+                .defineInRange("sliceGapDeg", 0, 0, 12);
 
         // IMPORTANT: use full signed range; 0xFFFFFFFF doesn't fit in int as a positive
         ringColor           = b.comment("ARGB color as int (0xAARRGGBB). Signed 32-bit; negatives are normal for opaque colors.")
                 .defineInRange("ringColor", 0xAA000000, Integer.MIN_VALUE, Integer.MAX_VALUE);
         hoverColor          = b.comment("Hover ARGB color as int (0xAARRGGBB).")
                 .defineInRange("hoverColor", 0xFFF20044, Integer.MIN_VALUE, Integer.MAX_VALUE);
+        borderColor         = b.comment("Border ARGB color as int (0xAARRGGBB).")
+                .defineInRange("borderColor", 0x66FFFFFF, Integer.MIN_VALUE, Integer.MAX_VALUE);
+        textColor           = b.comment("Center text ARGB color as int (0xAARRGGBB).")
+                .defineInRange("textColor", 0xFFFFFFFF, Integer.MIN_VALUE, Integer.MAX_VALUE);
 
         SPEC = b.build();
     }
@@ -78,17 +95,23 @@ public final class DesignClientConfig {
                     boolean hasAny = cfg.contains("deadzone") || cfg.contains("baseOuterRadius")
                             || cfg.contains("ringThickness") || cfg.contains("scaleStartThreshold")
                             || cfg.contains("scalePerItem") || cfg.contains("ringColor")
-                            || cfg.contains("hoverColor");
+                            || cfg.contains("hoverColor") || cfg.contains("designStyle")
+                            || cfg.contains("sliceGapDeg") || cfg.contains("borderColor")
+                            || cfg.contains("textColor");
                     if (hasAny) {
                         setIntSafely(deadzone,            cfg.getOrElse("deadzone",            deadzone.get()));
                         setIntSafely(baseOuterRadius,     cfg.getOrElse("baseOuterRadius",     baseOuterRadius.get()));
                         setIntSafely(ringThickness,       cfg.getOrElse("ringThickness",       ringThickness.get()));
                         setIntSafely(scaleStartThreshold, cfg.getOrElse("scaleStartThreshold", scaleStartThreshold.get()));
                         setIntSafely(scalePerItem,        cfg.getOrElse("scalePerItem",        scalePerItem.get()));
+                        setIntSafely(sliceGapDeg,         cfg.getOrElse("sliceGapDeg",         sliceGapDeg.get()));
+                        designStyle.set(normalizeStyle(String.valueOf(cfg.getOrElse("designStyle", designStyle.get()))));
 
                         // Colors: accept number or string; store as int
                         ringColor.set(parseColorAny(cfg.get("ringColor"), ringColor.get()));
                         hoverColor.set(parseColorAny(cfg.get("hoverColor"), hoverColor.get()));
+                        borderColor.set(parseColorAny(cfg.get("borderColor"), borderColor.get()));
+                        textColor.set(parseColorAny(cfg.get("textColor"), textColor.get()));
 
                         migrated = true;
                         Constants.LOG.info("[{}] Imported existing design-client.toml into ModConfigSpec (Configured-visible).", Constants.MOD_NAME);
@@ -109,6 +132,10 @@ public final class DesignClientConfig {
                     if (obj.has("scalePerItem"))        scalePerItem.set(obj.get("scalePerItem").getAsInt());
                     if (obj.has("ringColor"))           ringColor.set(parseColor(obj.get("ringColor").getAsString(), ringColor.get()));
                     if (obj.has("hoverColor"))          hoverColor.set(parseColor(obj.get("hoverColor").getAsString(), hoverColor.get()));
+                    if (obj.has("borderColor"))         borderColor.set(parseColor(obj.get("borderColor").getAsString(), borderColor.get()));
+                    if (obj.has("textColor"))           textColor.set(parseColor(obj.get("textColor").getAsString(), textColor.get()));
+                    if (obj.has("designStyle"))         designStyle.set(normalizeStyle(obj.get("designStyle").getAsString()));
+                    if (obj.has("sliceGapDeg"))         sliceGapDeg.set(obj.get("sliceGapDeg").getAsInt());
 
                     try {
                         Files.move(legacyJson, legacyJson.resolveSibling("radial.json.bak"),
@@ -159,5 +186,14 @@ public final class DesignClientConfig {
             Constants.LOG.warn("[{}] Bad color literal '{}'; using fallback 0x{}", Constants.MOD_NAME, s, Integer.toHexString(fallback));
             return fallback;
         }
+    }
+
+    private static String normalizeStyle(String in) {
+        if (in == null) return "SOLID";
+        String up = in.trim().toUpperCase(java.util.Locale.ROOT);
+        return switch (up) {
+            case "SOLID", "SEGMENTED", "OUTLINE", "GLASS" -> up;
+            default -> "SOLID";
+        };
     }
 }

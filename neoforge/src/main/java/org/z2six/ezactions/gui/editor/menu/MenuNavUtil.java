@@ -30,7 +30,11 @@ public final class MenuNavUtil {
         try {
             List<String> parts = RadialMenu.pathTitles();
             if (parts == null) return List.of();
-            return new ArrayList<>(parts);
+            ArrayList<String> out = new ArrayList<>(parts);
+            if (!out.isEmpty() && "root".equalsIgnoreCase(out.get(0))) {
+                out.remove(0);
+            }
+            return out;
         } catch (Throwable t) {
             Constants.LOG.debug("[{}] capturePathTitles failed: {}", Constants.MOD_NAME, t.toString());
             return List.of();

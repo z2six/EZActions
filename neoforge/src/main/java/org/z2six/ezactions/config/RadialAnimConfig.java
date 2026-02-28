@@ -23,6 +23,9 @@ public final class RadialAnimConfig {
     public final ModConfigSpec.BooleanValue animHover;
     public final ModConfigSpec.DoubleValue  hoverGrowPct;
     public final ModConfigSpec.IntValue     openCloseMs;
+    public final ModConfigSpec.ConfigValue<String> openStyle;
+    public final ModConfigSpec.ConfigValue<String> openDirection;
+    public final ModConfigSpec.ConfigValue<String> hoverStyle;
 
     static {
         // Build CONFIG instance + SPEC in one go
@@ -60,6 +63,34 @@ public final class RadialAnimConfig {
                 .translation("ezactions.config.openCloseMs")
                 .defineInRange("openCloseMs", 125, 0, 2000);
 
+        openStyle = b
+                .comment("Open/close style: WIPE, FADE, NONE")
+                .translation("ezactions.config.openStyle")
+                .define("openStyle", "WIPE", o -> {
+                    if (!(o instanceof String s)) return false;
+                    String up = s.trim().toUpperCase(java.util.Locale.ROOT);
+                    return "WIPE".equals(up) || "FADE".equals(up) || "NONE".equals(up);
+                });
+
+        openDirection = b
+                .comment("Wipe direction: CW or CCW")
+                .translation("ezactions.config.openDirection")
+                .define("openDirection", "CW", o -> {
+                    if (!(o instanceof String s)) return false;
+                    String up = s.trim().toUpperCase(java.util.Locale.ROOT);
+                    return "CW".equals(up) || "CCW".equals(up);
+                });
+
+        hoverStyle = b
+                .comment("Hover style: FILL_SCALE, FILL_ONLY, SCALE_ONLY, NONE")
+                .translation("ezactions.config.hoverStyle")
+                .define("hoverStyle", "FILL_SCALE", o -> {
+                    if (!(o instanceof String s)) return false;
+                    String up = s.trim().toUpperCase(java.util.Locale.ROOT);
+                    return "FILL_SCALE".equals(up) || "FILL_ONLY".equals(up)
+                            || "SCALE_ONLY".equals(up) || "NONE".equals(up);
+                });
+
         b.pop();
     }
 
@@ -88,9 +119,27 @@ public final class RadialAnimConfig {
             return v;
         } catch (Throwable t) { log(t); return 125; }
     }
+    public String openStyle() {
+        try { return normalize(openStyle.get(), "WIPE", java.util.Set.of("WIPE", "FADE", "NONE")); }
+        catch (Throwable t) { log(t); return "WIPE"; }
+    }
+    public String openDirection() {
+        try { return normalize(openDirection.get(), "CW", java.util.Set.of("CW", "CCW")); }
+        catch (Throwable t) { log(t); return "CW"; }
+    }
+    public String hoverStyle() {
+        try { return normalize(hoverStyle.get(), "FILL_SCALE", java.util.Set.of("FILL_SCALE", "FILL_ONLY", "SCALE_ONLY", "NONE")); }
+        catch (Throwable t) { log(t); return "FILL_SCALE"; }
+    }
 
     private static void log(Throwable t) {
         Constants.LOG.debug("[{}] RadialAnimConfig read failed: {}", Constants.MOD_NAME, t.toString());
+    }
+
+    private static String normalize(String in, String dflt, java.util.Set<String> allowed) {
+        if (in == null) return dflt;
+        String up = in.trim().toUpperCase(java.util.Locale.ROOT);
+        return allowed.contains(up) ? up : dflt;
     }
 
     private RadialAnimConfig() { throw new AssertionError("unreachable"); }

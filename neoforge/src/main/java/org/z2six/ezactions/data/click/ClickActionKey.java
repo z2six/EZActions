@@ -33,7 +33,7 @@ public final class ClickActionKey implements IClickAction {
     @Override
     public boolean execute(Minecraft mc) {
         try {
-            Constants.LOG.info("[{}] Key tap: '{}'", Constants.MOD_NAME, mappingName);
+            Constants.LOG.debug("[{}] Key tap: '{}'", Constants.MOD_NAME, mappingName);
             return InputInjector.deliver(mappingName, toggle, mode);
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] ClickActionKey execute failed '{}': {}", Constants.MOD_NAME, mappingName, t.toString());
@@ -53,7 +53,7 @@ public final class ClickActionKey implements IClickAction {
 
     @Override
     public Component getDisplayName() {
-        return Component.literal(mappingName);
+        return Component.translatable(mappingName);
     }
 
     /* ---------- JSON helpers, expected by MenuLoader ---------- */

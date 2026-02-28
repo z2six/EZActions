@@ -64,7 +64,7 @@ public final class KeybindPickerScreen extends Screen implements NoMenuBlurScree
     }
 
     public KeybindPickerScreen(Screen parent, Consumer<String> onPick) {
-        super(Component.literal("Choose Keybinding"));
+        super(Component.translatable("ezactions.gui.keybind_picker.title"));
         this.parent = parent;
         this.onPick = onPick;
     }
@@ -80,8 +80,8 @@ public final class KeybindPickerScreen extends Screen implements NoMenuBlurScree
             int fx = PADDING;
             int fy = PADDING;
             int fw = Math.max(60, this.width - (PADDING * 2) - 8); // leave a tiny right margin for scrollbar area
-            filterBox = new EditBox(this.font, fx, fy, fw, FILTER_H, Component.literal("Filter"));
-            filterBox.setHint(Component.literal("Filter by mod / key id / label…"));
+            filterBox = new EditBox(this.font, fx, fy, fw, FILTER_H, Component.translatable("ezactions.gui.field.filter"));
+            filterBox.setHint(Component.translatable("ezactions.gui.keybind_picker.hint.filter"));
             filterBox.setMaxLength(FILTER_MAX_LEN);
             filterBox.setResponder(s -> {
                 try {
@@ -243,7 +243,7 @@ public final class KeybindPickerScreen extends Screen implements NoMenuBlurScree
                 try {
                     if (r.mapping != null) {
                         String mappingKey = r.mapping.getName(); // e.g. "key.inventory"
-                        Constants.LOG.info("[{}] KeybindPicker: picked {}", Constants.MOD_NAME, mappingKey);
+                        Constants.LOG.debug("[{}] KeybindPicker: picked {}", Constants.MOD_NAME, mappingKey);
                         onPick.accept(mappingKey);
                     } else {
                         Constants.LOG.debug("[{}] KeybindPicker: clicked Use on null mapping row (ignored).", Constants.MOD_NAME);
@@ -312,7 +312,7 @@ public final class KeybindPickerScreen extends Screen implements NoMenuBlurScree
                 int btnH = ROW_H - 6;
 
                 g.fill(btnX, btnY, btnX + btnW, btnY + btnH, 0x40000000);
-                Component b = Component.literal("Use");
+                Component b = Component.translatable("ezactions.gui.keybind_picker.use");
                 int tw = this.font.width(b);
                 g.drawString(this.font, b, btnX + (btnW - tw) / 2, btnY + 5, 0xFFFFFF);
             }

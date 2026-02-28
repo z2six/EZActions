@@ -20,14 +20,21 @@ public final class ClickActionCommand implements IClickAction {
 
     private final String commandRaw; // as stored (may include newlines and/or leading '/')
     private final int delayTicks;    // 0 = no delay; >0 => schedule with sequencer
+    private final boolean cycleCommands; // true => execute one line per trigger, rotating
+    private int cycleCursor = 0;
 
     public ClickActionCommand(String command) {
-        this(command, 0);
+        this(command, 0, false);
     }
 
     public ClickActionCommand(String command, int delayTicks) {
+        this(command, delayTicks, false);
+    }
+
+    public ClickActionCommand(String command, int delayTicks, boolean cycleCommands) {
         this.commandRaw = command == null ? "" : command.trim();
         this.delayTicks = Math.max(0, delayTicks);
+        this.cycleCommands = cycleCommands;
     }
 
     // --- Expose fields for editors/serialization helpers ----
@@ -40,6 +47,8 @@ public final class ClickActionCommand implements IClickAction {
 
     /** Per-action delay between lines in ticks (0 = immediate). */
     public int getDelayTicks() { return this.delayTicks; }
+    /** Whether this action cycles one command line per trigger. */
+    public boolean isCycleCommands() { return this.cycleCommands; }
 
     // --- IClickAction --------------------------------------------------------
 
@@ -58,7 +67,7 @@ public final class ClickActionCommand implements IClickAction {
     public Component getDisplayName() {
         // Show first line (normalized) as a compact label
         String s = normalizedFirstLine();
-        return Component.literal(s.isEmpty() ? "(empty)" : s);
+        return s.isEmpty() ? Component.translatable("ezactions.action.command.empty") : Component.literal(s);
     }
 
     @Override
@@ -80,8 +89,26 @@ public final class ClickActionCommand implements IClickAction {
                 return false;
             }
 
+            if (this.cycleCommands) {
+                CommandSequencer.cancel();
+                final int pick = Math.floorMod(this.cycleCursor, lines.length);
+                final String one = lines[pick];
+                this.cycleCursor = (pick + 1) % lines.length;
+
+                mc.execute(() -> {
+                    try {
+                        player.connection.sendCommand(one);
+                        Constants.LOG.debug("[{}] Sent cycled command [{} / {}]: {}", Constants.MOD_NAME, pick + 1, lines.length, one);
+                    } catch (Throwable t) {
+                        Constants.LOG.warn("[{}] cycled sendCommand failed for '{}': {}", Constants.MOD_NAME, one, t.toString());
+                    }
+                });
+                return true;
+            }
+
             final int dly = this.delayTicks;
             if (dly <= 0 || lines.length == 1) {
+                CommandSequencer.cancel();
                 // Immediate dispatch on the client thread
                 mc.execute(() -> {
                     for (String cmd : lines) {
@@ -114,6 +141,7 @@ public final class ClickActionCommand implements IClickAction {
             o.addProperty("type", getType().name());
             o.addProperty("command", this.commandRaw);
             o.addProperty("delayTicks", this.delayTicks); // backward compatible; absent => 0
+            o.addProperty("cycleCommands", this.cycleCommands);
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] ClickActionCommand serialize failed: {}", Constants.MOD_NAME, t.toString());
         }
@@ -124,7 +152,8 @@ public final class ClickActionCommand implements IClickAction {
         try {
             String cmd = o.has("command") ? o.get("command").getAsString() : "";
             int dly = o.has("delayTicks") ? Math.max(0, o.get("delayTicks").getAsInt()) : 0;
-            return new ClickActionCommand(cmd, dly);
+            boolean cyc = o.has("cycleCommands") && o.get("cycleCommands").getAsBoolean();
+            return new ClickActionCommand(cmd, dly, cyc);
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] ClickActionCommand deserialize failed: {}", Constants.MOD_NAME, t.toString());
             return new ClickActionCommand("");

@@ -4,6 +4,7 @@ import com.google.gson.*;
 import org.z2six.ezactions.api.ImportExport;
 import org.z2six.ezactions.api.MenuPath;
 import org.z2six.ezactions.Constants;
+import org.z2six.ezactions.api.events.ApiEvents;
 import org.z2six.ezactions.data.menu.MenuItem;
 import org.z2six.ezactions.data.menu.RadialMenu;
 
@@ -11,6 +12,11 @@ import java.util.List;
 import java.util.Optional;
 
 final class ImportExportImpl implements ImportExport {
+    private final ApiEvents events;
+
+    ImportExportImpl(ApiEvents events) {
+        this.events = events;
+    }
 
     @Override
     public String exportAllJson() {
@@ -33,7 +39,7 @@ final class ImportExportImpl implements ImportExport {
     public int importInto(MenuPath path, String json) {
         try {
             JsonElement el = JsonParser.parseString(json == null ? "[]" : json.trim());
-            JsonArray arr = el.isJsonArray() ? el.getAsJsonArray() : new JsonArray();
+            JsonArray arr = toArray(el);
             List<MenuItem> dst = (path == null || path.titles().isEmpty())
                     ? RadialMenu.rootMutable()
                     : TreeOps.findBundleByTitles(RadialMenu.rootMutable(), path.titles());
@@ -47,7 +53,11 @@ final class ImportExportImpl implements ImportExport {
                     count++;
                 }
             }
-            if (count > 0) try { RadialMenu.persist(); } catch (Throwable ignored) {}
+            if (count > 0) {
+                try { RadialMenu.persist(); } catch (Throwable ignored) {}
+                try { events._fireImported(path == null ? MenuPath.root() : path, json, count); } catch (Throwable ignored) {}
+                try { events._fireChanged(path == null ? MenuPath.root() : path, "importInto"); } catch (Throwable ignored) {}
+            }
             return count;
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] importInto failed: {}", Constants.MOD_NAME, t.toString());
@@ -70,6 +80,8 @@ final class ImportExportImpl implements ImportExport {
                 root.add(JsonCodec.fromJson(el.getAsJsonObject()));
             }
             try { RadialMenu.persist(); } catch (Throwable ignored) {}
+            try { events._fireImported(MenuPath.root(), json, root.size()); } catch (Throwable ignored) {}
+            try { events._fireChanged(MenuPath.root(), "replaceAll"); } catch (Throwable ignored) {}
             return root.size();
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] replaceAll failed: {}", Constants.MOD_NAME, t.toString());
@@ -80,14 +92,23 @@ final class ImportExportImpl implements ImportExport {
     @Override
     public Optional<String> validate(String json) {
         try {
-            // Basic shape validation only (we don’t know your full schema constraints yet).
             JsonElement el = JsonParser.parseString(json == null ? "" : json.trim());
             if (!el.isJsonObject() && !el.isJsonArray()) {
                 return Optional.of("JSON must be an object or array.");
             }
+            Optional<String> err = JsonCodec.validate(el);
+            if (err.isPresent()) return err;
             return Optional.empty();
         } catch (Throwable t) {
             return Optional.of("Invalid JSON: " + t.getMessage());
         }
+    }
+
+    private static JsonArray toArray(JsonElement el) {
+        if (el == null || el.isJsonNull()) return new JsonArray();
+        if (el.isJsonArray()) return el.getAsJsonArray();
+        JsonArray arr = new JsonArray();
+        if (el.isJsonObject()) arr.add(el.getAsJsonObject());
+        return arr;
     }
 }

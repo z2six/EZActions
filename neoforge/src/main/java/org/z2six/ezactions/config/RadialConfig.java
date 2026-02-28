@@ -34,6 +34,10 @@ public final class RadialConfig {
     public int scalePerItem = 6;
     public int ringColor = 0xAA000000;  // ARGB
     public int hoverColor = 0xFFF20044; // ARGB
+    public int borderColor = 0x66FFFFFF;
+    public int textColor = 0xFFFFFFFF;
+    public int sliceGapDeg = 0;
+    public String designStyle = "SOLID";
 
     private static final String NEW_FILE = "design-client.toml";
     private static final String LEGACY_JSON = "radial.json";
@@ -68,6 +72,10 @@ public final class RadialConfig {
                 c.scalePerItem        = DesignClientConfig.scalePerItem.get();
                 c.ringColor           = DesignClientConfig.ringColor.get();
                 c.hoverColor          = DesignClientConfig.hoverColor.get();
+                c.borderColor         = DesignClientConfig.borderColor.get();
+                c.textColor           = DesignClientConfig.textColor.get();
+                c.sliceGapDeg         = DesignClientConfig.sliceGapDeg.get();
+                c.designStyle         = normalizeDesignStyle(DesignClientConfig.designStyle.get());
                 return c;
             }
         } catch (Throwable t) {
@@ -91,6 +99,10 @@ public final class RadialConfig {
                 c.scalePerItem        = getInt(cfg, "scalePerItem",        c.scalePerItem);
                 c.ringColor           = getColor(cfg, "ringColor",         c.ringColor);
                 c.hoverColor          = getColor(cfg, "hoverColor",        c.hoverColor);
+                c.borderColor         = getColor(cfg, "borderColor",       c.borderColor);
+                c.textColor           = getColor(cfg, "textColor",         c.textColor);
+                c.sliceGapDeg         = getInt(cfg, "sliceGapDeg",         c.sliceGapDeg);
+                c.designStyle         = normalizeDesignStyle(getString(cfg, "designStyle", c.designStyle));
                 return c;
             } catch (Throwable t) {
                 Constants.LOG.warn("[{}] Failed to load {}: {} (writing defaults)", Constants.MOD_NAME, toml, t.toString());
@@ -112,6 +124,10 @@ public final class RadialConfig {
                     if (o.has("scalePerItem"))        c.scalePerItem = safeInt(o.get("scalePerItem"),     c.scalePerItem);
                     if (o.has("ringColor"))           c.ringColor  = parseColor(o.get("ringColor").getAsString(),  c.ringColor);
                     if (o.has("hoverColor"))          c.hoverColor = parseColor(o.get("hoverColor").getAsString(), c.hoverColor);
+                    if (o.has("borderColor"))         c.borderColor = parseColor(o.get("borderColor").getAsString(), c.borderColor);
+                    if (o.has("textColor"))           c.textColor = parseColor(o.get("textColor").getAsString(), c.textColor);
+                    if (o.has("sliceGapDeg"))         c.sliceGapDeg = safeInt(o.get("sliceGapDeg"), c.sliceGapDeg);
+                    if (o.has("designStyle"))         c.designStyle = normalizeDesignStyle(o.get("designStyle").getAsString());
                 }
                 save(c);
                 try { Files.move(legacy, legacy.resolveSibling("radial.json.bak"), StandardCopyOption.REPLACE_EXISTING); }
@@ -142,6 +158,10 @@ public final class RadialConfig {
                 DesignClientConfig.scalePerItem.set(c.scalePerItem);
                 DesignClientConfig.ringColor.set(c.ringColor);
                 DesignClientConfig.hoverColor.set(c.hoverColor);
+                DesignClientConfig.borderColor.set(c.borderColor);
+                DesignClientConfig.textColor.set(c.textColor);
+                DesignClientConfig.sliceGapDeg.set(c.sliceGapDeg);
+                DesignClientConfig.designStyle.set(normalizeDesignStyle(c.designStyle));
                 return;
             }
         } catch (Throwable t) {
@@ -159,6 +179,10 @@ public final class RadialConfig {
             root.set("scalePerItem",        c.scalePerItem);
             root.set("ringColor",           c.ringColor);
             root.set("hoverColor",          c.hoverColor);
+            root.set("borderColor",         c.borderColor);
+            root.set("textColor",           c.textColor);
+            root.set("sliceGapDeg",         c.sliceGapDeg);
+            root.set("designStyle",         normalizeDesignStyle(c.designStyle));
 
             try (CommentedFileConfig cfg = CommentedFileConfig.builder(f, TomlFormat.instance())
                     .sync().preserveInsertionOrder().build()) {
@@ -207,6 +231,14 @@ public final class RadialConfig {
         return dflt;
     }
 
+    private static String getString(CommentedFileConfig cfg, String key, String dflt) {
+        try {
+            Object v = cfg.get(key);
+            if (v instanceof String s && !s.isBlank()) return s;
+        } catch (Throwable ignored) {}
+        return dflt;
+    }
+
     private static int parseColor(String s, int fallback) {
         try {
             String t = s == null ? "" : s.trim();
@@ -224,5 +256,14 @@ public final class RadialConfig {
 
     private static int safeInt(com.google.gson.JsonElement el, int dflt) {
         try { return el.getAsInt(); } catch (Throwable ignored) { return dflt; }
+    }
+
+    private static String normalizeDesignStyle(String in) {
+        if (in == null) return "SOLID";
+        String up = in.trim().toUpperCase(java.util.Locale.ROOT);
+        return switch (up) {
+            case "SOLID", "SEGMENTED", "OUTLINE", "GLASS" -> up;
+            default -> "SOLID";
+        };
     }
 }

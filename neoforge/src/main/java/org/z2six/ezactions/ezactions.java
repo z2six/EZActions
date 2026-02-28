@@ -10,6 +10,7 @@ import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
 import org.z2six.ezactions.config.DesignClientConfig;
 import org.z2six.ezactions.handler.KeyboardHandler;
+import org.z2six.ezactions.util.CustomIconManager;
 import org.z2six.ezactions.util.EZActionsKeybinds;
 
 /**
@@ -59,6 +60,7 @@ public final class ezactions {
         try {
             // GAME bus (global): client tick listeners
             if (FMLEnvironment.dist == Dist.CLIENT) {
+                try { CustomIconManager.ensureFolderReady(); } catch (Throwable ignored) {}
                 NeoForge.EVENT_BUS.addListener(KeyboardHandler::onClientTickPre);
                 NeoForge.EVENT_BUS.addListener(KeyboardHandler::onClientTickPost);
                 Constants.LOG.debug("[{}] Registered GAME-bus listeners (Pre & Post).", Constants.MOD_NAME);

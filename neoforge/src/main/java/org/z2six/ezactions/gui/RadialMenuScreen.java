@@ -6,7 +6,9 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.z2six.ezactions.Constants;
+import org.z2six.ezactions.config.GeneralClientConfig;
 import org.z2six.ezactions.config.RadialAnimConfigView;
+import org.z2six.ezactions.config.RadialConfig;
 import org.z2six.ezactions.data.menu.MenuItem;
 import org.z2six.ezactions.data.menu.RadialMenu;
 import org.z2six.ezactions.gui.RadialScreenMath.Radii;
@@ -37,14 +39,19 @@ public final class RadialMenuScreen extends Screen implements NoMenuBlurScreen {
     private final SliceHoverAnim hoverAnim = new SliceHoverAnim();
 
     public RadialMenuScreen() {
-        super(Component.literal("ezactions Radial"));
+        super(Component.translatable("ezactions.gui.radial.title"));
     }
 
     @Override
     protected void init() {
         super.init();
-        // Start open wipe (config will gate its usage during render)
-        openTrans.start(+1);
+        // Start open wipe (temporary API style may override duration)
+        org.z2six.ezactions.data.menu.RadialMenu.TemporaryStyle temp = RadialMenu.temporaryStyle();
+        if (temp != null && temp.openCloseMs != null) {
+            openTrans.startOpening(System.currentTimeMillis(), Math.max(1, temp.openCloseMs));
+        } else {
+            openTrans.start(+1);
+        }
     }
 
     @Override
@@ -72,10 +79,11 @@ public final class RadialMenuScreen extends Screen implements NoMenuBlurScreen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        List<MenuItem> items = java.util.List.of();
+        int cx = this.width / 2;
+        int cy = this.height / 2;
         try {
-            List<MenuItem> items = RadialMenu.visibleItemsForDisplay();
-            final int cx = this.width / 2;
-            final int cy = this.height / 2;
+            items = RadialMenu.visibleItemsForDisplay();
 
             final int count = (items == null) ? 0 : items.size();
             final Radii rr = RadialScreenMath.computeRadii(count);
@@ -89,7 +97,10 @@ public final class RadialMenuScreen extends Screen implements NoMenuBlurScreen {
 
             // Decide open/close progress via config
             final RadialAnimConfigView view = RadialAnimConfigView.get();
-            final float openProg = (view.animationsEnabled && view.animOpenClose)
+            final org.z2six.ezactions.data.menu.RadialMenu.TemporaryStyle temp = RadialMenu.temporaryStyle();
+            final boolean animationsEnabled = (temp != null && temp.animationsEnabled != null) ? temp.animationsEnabled : view.animationsEnabled;
+            final boolean animOpenClose = (temp != null && temp.animOpenClose != null) ? temp.animOpenClose : view.animOpenClose;
+            final float openProg = (animationsEnabled && animOpenClose)
                     ? openTrans.progress()
                     : 1.0f;
 
@@ -100,6 +111,31 @@ public final class RadialMenuScreen extends Screen implements NoMenuBlurScreen {
         }
 
         super.render(g, mouseX, mouseY, partialTick);
+        renderHoveredLabel(g, items, cx, cy);
+    }
+
+    private void renderHoveredLabel(GuiGraphics g, List<MenuItem> items, int cx, int cy) {
+        try {
+            if (!GeneralClientConfig.CONFIG.showRadialHoverLabel()) return;
+            if (items == null || items.isEmpty()) return;
+            if (hoveredIndex < 0 || hoveredIndex >= items.size()) return;
+
+            MenuItem mi = items.get(hoveredIndex);
+            if (mi == null) return;
+            Component comp = mi.titleComponent();
+            if (comp == null || comp.getString().isEmpty()) return;
+
+            int textW = this.font.width(comp.getVisualOrderText());
+            int x = cx - (textW / 2);
+            int y = cy - (this.font.lineHeight / 2);
+            int padX = 6;
+            int padY = 3;
+            g.fill(x - padX, y - padY, x + textW + padX, y + this.font.lineHeight + padY, 0xB0000000);
+
+            RadialMenu.TemporaryStyle temp = RadialMenu.temporaryStyle();
+            int textColor = (temp != null && temp.textColor != null) ? temp.textColor : RadialConfig.get().textColor;
+            g.drawString(this.font, comp, x, y, textColor, false);
+        } catch (Throwable ignored) {}
     }
 
     @Override
@@ -139,7 +175,7 @@ public final class RadialMenuScreen extends Screen implements NoMenuBlurScreen {
 
     private void executeAndClose(MenuItem mi) {
         try {
-            Constants.LOG.info("[{}] Radial: execute action id='{}' title='{}' (closing then deferring)",
+            Constants.LOG.debug("[{}] Radial: execute action id='{}' title='{}' (closing then deferring)",
                     Constants.MOD_NAME, mi.id(), mi.title());
             Minecraft mc = this.minecraft;
             onClose(); // close first
@@ -163,7 +199,8 @@ public final class RadialMenuScreen extends Screen implements NoMenuBlurScreen {
     public void onClose() {
         try {
             Minecraft mc = Minecraft.getInstance();
-            if (mc != null) mc.setScreen(null);
+            net.minecraft.client.gui.screens.Screen ret = RadialMenu.onRadialClosed();
+            if (mc != null) mc.setScreen(ret);
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] Radial onClose error: {}", Constants.MOD_NAME, t.toString());
         }

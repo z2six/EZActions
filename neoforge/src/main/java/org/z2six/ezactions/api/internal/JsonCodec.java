@@ -1,112 +1,138 @@
 package org.z2six.ezactions.api.internal;
 
-import com.google.gson.*;
-import org.z2six.ezactions.Constants;
-import org.z2six.ezactions.data.click.IClickAction;
-import org.z2six.ezactions.data.menu.MenuItem;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import org.z2six.ezactions.data.json.ClickActionSerializer;
+import org.z2six.ezactions.data.menu.MenuItem;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
- * Minimal JSON bridge for MenuItem <-> JsonObject.
- * - Icons: serialized as null for now (future-safe placeholder).
- * - Actions: delegated to ClickActionSerializer (raw data object).
+ * JSON bridge for API import/export.
+ * Uses the same schema as live menu.json / clipboard import-export.
  */
 final class JsonCodec {
     private JsonCodec() {}
 
     static JsonObject toJson(MenuItem mi) {
-        JsonObject o = new JsonObject();
-        put(o, "id", mi.id());
-        put(o, "title", mi.title());
-        put(o, "note", mi.note());
-        o.add("icon", JsonNull.INSTANCE); // reserved for future
-        if (mi.isCategory()) {
-            o.addProperty("type", "BUNDLE");
-            List<MenuItem> kids = null;
-            try { kids = mi.childrenMutable(); } catch (Throwable ignored) {}
-            JsonArray arr = new JsonArray();
-            if (kids != null) {
-                for (MenuItem k : kids) {
-                    try { arr.add(toJson(k)); } catch (Throwable ignored) {}
-                }
-            }
-            o.add("children", arr);
-        } else {
-            o.addProperty("type", "ACTION");
-            JsonObject a = new JsonObject();
-            a.addProperty("kind", "internal");
-            try {
-                IClickAction act = mi.action(); // if you have it; if not, serializer must be able to get it from item
-                JsonObject data = ClickActionSerializer.serialize(act);
-                a.add("data", data != null ? data : new JsonObject());
-            } catch (Throwable t) {
-                Constants.LOG.warn("[{}] JsonCodec: action serialize failed: {}", Constants.MOD_NAME, t.toString());
-                a.add("data", new JsonObject());
-            }
-            o.add("action", a);
-        }
-        return o;
+        return (mi == null) ? new JsonObject() : mi.serialize();
     }
 
     static MenuItem fromJson(JsonObject o) {
-        String id = optString(o, "id", freshId("api"));
-        String title = optString(o, "title", "");
-        String note = optString(o, "note", "");
-
-        String type = optString(o, "type", "ACTION");
-        if ("BUNDLE".equals(type)) {
-            List<MenuItem> children = new ArrayList<>();
-            JsonArray arr = o.has("children") && o.get("children").isJsonArray() ? o.getAsJsonArray("children") : new JsonArray();
-            for (JsonElement el : arr) {
-                if (el.isJsonObject()) {
-                    try { children.add(fromJson(el.getAsJsonObject())); }
-                    catch (Throwable ignored) {}
-                }
-            }
-            return new MenuItem(id, title, note, null, null, children);
-        } else {
-            // ACTION
-            IClickAction act = null;
-            try {
-                JsonObject action = (o.has("action") && o.get("action").isJsonObject()) ? o.getAsJsonObject("action") : new JsonObject();
-                JsonObject data = action.has("data") && action.get("data").isJsonObject() ? action.getAsJsonObject("data") : new JsonObject();
-                act = ClickActionSerializer.deserialize(data);
-            } catch (Throwable t) {
-                Constants.LOG.warn("[{}] JsonCodec: action deserialize failed: {}", Constants.MOD_NAME, t.toString());
-            }
-            return new MenuItem(id, title, note, null, act, null);
-        }
+        return MenuItem.deserialize(o == null ? new JsonObject() : o);
     }
-
-    // convenience
 
     static JsonArray toJsonArray(List<MenuItem> list) {
         JsonArray arr = new JsonArray();
-        if (list != null) for (MenuItem mi : list) arr.add(toJson(mi));
+        if (list != null) {
+            for (MenuItem mi : list) arr.add(toJson(mi));
+        }
         return arr;
     }
 
     static List<MenuItem> fromJsonArray(JsonArray arr) {
         List<MenuItem> out = new ArrayList<>();
-        for (JsonElement el : arr) if (el.isJsonObject()) out.add(fromJson(el.getAsJsonObject()));
+        if (arr == null) return out;
+        for (JsonElement el : arr) {
+            if (el != null && el.isJsonObject()) out.add(fromJson(el.getAsJsonObject()));
+        }
         return out;
     }
 
-    private static void put(JsonObject o, String k, String v) {
-        if (v == null) o.add(k, JsonNull.INSTANCE); else o.addProperty(k, v);
+    static Optional<String> validate(JsonElement root) {
+        if (root == null || root.isJsonNull()) return Optional.of("JSON is empty.");
+        if (root.isJsonArray()) {
+            JsonArray arr = root.getAsJsonArray();
+            for (int i = 0; i < arr.size(); i++) {
+                JsonElement el = arr.get(i);
+                if (el == null || !el.isJsonObject()) {
+                    return Optional.of("Entry #" + (i + 1) + " must be an object.");
+                }
+                Optional<String> err = validateItem(el.getAsJsonObject(), "$[" + i + "]");
+                if (err.isPresent()) return err;
+            }
+            return Optional.empty();
+        }
+        if (root.isJsonObject()) {
+            return validateItem(root.getAsJsonObject(), "$");
+        }
+        return Optional.of("JSON must be an object or array.");
     }
 
-    private static String optString(JsonObject o, String k, String def) {
-        if (o == null || !o.has(k)) return def;
-        JsonElement e = o.get(k);
-        return e == null || e.isJsonNull() ? def : e.getAsString();
+    private static Optional<String> validateItem(JsonObject o, String path) {
+        if (o == null) return Optional.of(path + " is null.");
+
+        Optional<String> err;
+        err = validateStringOrComponent(o, "title", path); if (err.isPresent()) return err;
+        err = validateStringOrComponent(o, "note", path); if (err.isPresent()) return err;
+        err = validateStringOrNull(o, "id", path); if (err.isPresent()) return err;
+        err = validateStringOrNull(o, "icon", path); if (err.isPresent()) return err;
+        err = validateBooleanOrNull(o, "hideFromMainRadial", path); if (err.isPresent()) return err;
+        err = validateBooleanOrNull(o, "bundleKeybindEnabled", path); if (err.isPresent()) return err;
+        err = validateBooleanOrNull(o, "locked", path); if (err.isPresent()) return err;
+
+        boolean hasAction = o.has("action") && o.get("action") != null && o.get("action").isJsonObject();
+        boolean hasChildren = o.has("children") && o.get("children") != null && o.get("children").isJsonArray();
+
+        if (hasAction && hasChildren) {
+            return Optional.of(path + " cannot contain both 'action' and 'children'.");
+        }
+        if (!hasAction && !hasChildren) {
+            return Optional.of(path + " must contain either 'action' (action item) or 'children' (bundle).");
+        }
+
+        if (hasAction) {
+            try {
+                JsonObject action = o.getAsJsonObject("action");
+                if (!action.has("type") || !action.get("type").isJsonPrimitive()) {
+                    return Optional.of(path + ".action.type is required and must be a string.");
+                }
+                ClickActionSerializer.deserialize(action);
+            } catch (Throwable t) {
+                return Optional.of(path + ".action is invalid: " + t.getMessage());
+            }
+        }
+
+        if (hasChildren) {
+            JsonArray kids = o.getAsJsonArray("children");
+            for (int i = 0; i < kids.size(); i++) {
+                JsonElement child = kids.get(i);
+                if (child == null || !child.isJsonObject()) {
+                    return Optional.of(path + ".children[" + i + "] must be an object.");
+                }
+                Optional<String> childErr = validateItem(child.getAsJsonObject(), path + ".children[" + i + "]");
+                if (childErr.isPresent()) return childErr;
+            }
+        }
+
+        return Optional.empty();
     }
 
-    private static String freshId(String prefix) {
-        long t = System.currentTimeMillis();
-        return prefix + "_" + Long.toHexString(t) + "_" + Integer.toHexString((int)(Math.random()*0xFFFF));
+    private static Optional<String> validateStringOrComponent(JsonObject o, String key, String path) {
+        if (!o.has(key) || o.get(key) == null || o.get(key).isJsonNull()) return Optional.empty();
+        JsonElement el = o.get(key);
+        if (el.isJsonPrimitive()) return Optional.empty();
+        if (el.isJsonObject() || el.isJsonArray()) return Optional.empty();
+        return Optional.of(path + "." + key + " must be a string or text component JSON.");
+    }
+
+    private static Optional<String> validateStringOrNull(JsonObject o, String key, String path) {
+        if (!o.has(key) || o.get(key) == null || o.get(key).isJsonNull()) return Optional.empty();
+        if (o.get(key).isJsonPrimitive()) return Optional.empty();
+        return Optional.of(path + "." + key + " must be a string.");
+    }
+
+    private static Optional<String> validateBooleanOrNull(JsonObject o, String key, String path) {
+        if (!o.has(key) || o.get(key) == null || o.get(key).isJsonNull()) return Optional.empty();
+        if (o.get(key).isJsonPrimitive()) {
+            try {
+                o.get(key).getAsBoolean();
+                return Optional.empty();
+            } catch (Throwable ignored) {}
+        }
+        return Optional.of(path + "." + key + " must be a boolean.");
     }
 }

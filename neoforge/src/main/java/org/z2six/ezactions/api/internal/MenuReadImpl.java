@@ -20,14 +20,14 @@ final class MenuReadImpl implements MenuRead {
                 : TreeOps.findBundleByTitles(root, path.titles());
         List<ApiMenuItem> out = new ArrayList<>();
         if (at == null) return out;
-        for (MenuItem mi : at) out.add(snap(mi));
+        for (MenuItem mi : at) out.add(ApiMapper.toApi(mi));
         return out;
     }
 
     @Override
     public Optional<ApiMenuItem> findById(String id) {
         MenuItem mi = TreeOps.findFirstById(RadialMenu.rootMutable(), id);
-        return mi == null ? Optional.empty() : Optional.of(snap(mi));
+        return mi == null ? Optional.empty() : Optional.of(ApiMapper.toApi(mi));
     }
 
     @Override
@@ -40,18 +40,4 @@ final class MenuReadImpl implements MenuRead {
         return TreeOps.existsPath(RadialMenu.rootMutable(), path == null ? List.of() : path.titles());
     }
 
-    private static ApiMenuItem snap(MenuItem mi) {
-        String type = mi.isCategory() ? "BUNDLE" : "ACTION";
-        return new ApiMenuItem(
-                safe(mi.id()),
-                safe(mi.title()),
-                mi.isCategory(),
-                type,
-                nullToNull(mi.note()),
-                null // icon reserved
-        );
-    }
-
-    private static String safe(String s) { return s == null ? "" : s; }
-    private static String nullToNull(String s) { return s; }
 }

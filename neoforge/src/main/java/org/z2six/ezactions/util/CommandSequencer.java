@@ -81,6 +81,11 @@ public final class CommandSequencer {
         }
     }
 
+    /** Cancel any in-flight command sequence immediately. */
+    public static void cancel() {
+        clear();
+    }
+
     private static void clear() {
         queue.clear();
         ticksLeft = 0;

@@ -7,6 +7,9 @@ import org.z2six.ezactions.api.MenuPath;
 import org.z2six.ezactions.api.MenuWrite;
 import org.z2six.ezactions.api.ApiMenuItem;
 import org.z2six.ezactions.Constants;
+import org.z2six.ezactions.api.events.ApiEvents;
+import org.z2six.ezactions.data.click.IClickAction;
+import org.z2six.ezactions.data.icon.IconSpec;
 import org.z2six.ezactions.data.menu.MenuItem;
 import org.z2six.ezactions.data.menu.RadialMenu;
 
@@ -15,6 +18,69 @@ import java.util.List;
 import java.util.Optional;
 
 final class MenuWriteImpl implements MenuWrite {
+    private final ApiEvents events;
+
+    MenuWriteImpl(ApiEvents events) {
+        this.events = events;
+    }
+
+    @Override
+    public Optional<String> addAction(MenuPath path, String title, String noteOrNull, IconSpec iconOrNull, IClickAction action, boolean locked) {
+        if (action == null) return Optional.empty();
+        List<MenuItem> root = RadialMenu.rootMutable();
+        List<MenuItem> at = (path == null || path.titles().isEmpty())
+                ? root
+                : TreeOps.findBundleByTitles(root, path.titles());
+        if (at == null) return Optional.empty();
+
+        String id = freshId("act");
+        MenuItem item = new MenuItem(
+                id,
+                safe(title),
+                safe(noteOrNull),
+                iconOrNull,
+                action,
+                null,
+                false,
+                false,
+                locked
+        );
+        at.add(item);
+        try { RadialMenu.persist(); } catch (Throwable ignored) {}
+        fireChanged(path, "addAction");
+        Constants.LOG.info("[{}] API addAction: id='{}' path='{}' locked={}",
+                Constants.MOD_NAME, id, pathToString(path), locked);
+        return Optional.of(id);
+    }
+
+    @Override
+    public Optional<String> addBundle(MenuPath path, String title, String noteOrNull, IconSpec iconOrNull,
+                                      boolean hideFromMainRadial, boolean bundleKeybindEnabled, boolean locked) {
+        List<MenuItem> root = RadialMenu.rootMutable();
+        List<MenuItem> at = (path == null || path.titles().isEmpty())
+                ? root
+                : TreeOps.findBundleByTitles(root, path.titles());
+        if (at == null) return Optional.empty();
+
+        String id = freshId("bundle");
+        MenuItem item = new MenuItem(
+                id,
+                safe(title),
+                safe(noteOrNull),
+                iconOrNull,
+                null,
+                new ArrayList<>(),
+                hideFromMainRadial,
+                bundleKeybindEnabled,
+                locked
+        );
+        at.add(item);
+        try { RadialMenu.persist(); } catch (Throwable ignored) {}
+        fireChanged(path, "addBundle");
+        Constants.LOG.info("[{}] API addBundle: id='{}' path='{}' hideFromMainRadial={} keybindEnabled={} locked={}",
+                Constants.MOD_NAME, id, pathToString(path), hideFromMainRadial, bundleKeybindEnabled, locked);
+        return Optional.of(id);
+    }
 
     @Override
     public boolean moveWithin(MenuPath path, int fromIndex, int toIndex) {
@@ -35,6 +101,7 @@ final class MenuWriteImpl implements MenuWrite {
         if (toIndex > fromIndex) toIndex--;
         at.add(toIndex, moved);
         try { RadialMenu.persist(); } catch (Throwable ignored) {}
+        fireChanged(path, "moveWithin");
         return true;
     }
 
@@ -59,6 +126,7 @@ final class MenuWriteImpl implements MenuWrite {
             MenuItem removed = src.parent.remove(src.index);
             dst.add(removed);
             try { RadialMenu.persist(); } catch (Throwable ignored) {}
+            fireChanged(targetBundle, "moveTo");
             return true;
         }
         return false;
@@ -74,14 +142,12 @@ final class MenuWriteImpl implements MenuWrite {
 
         for (int i = 0; i < at.size(); i++) {
             MenuItem mi = at.get(i);
-            ApiMenuItem snap = new ApiMenuItem(
-                    safe(mi.id()), safe(mi.title()), mi.isCategory(),
-                    mi.isCategory() ? "BUNDLE" : "ACTION",
-                    mi.note(), null
-            );
+            if (mi != null && mi.locked()) continue;
+            ApiMenuItem snap = ApiMapper.toApi(mi);
             if (predicate.test(snap)) {
                 at.remove(i);
                 try { RadialMenu.persist(); } catch (Throwable ignored) {}
+                fireChanged(path, "removeFirst");
                 return true;
             }
         }
@@ -91,8 +157,76 @@ final class MenuWriteImpl implements MenuWrite {
     @Override
     public boolean removeById(String id) {
         boolean ok = TreeOps.removeByIdRecursive(RadialMenu.rootMutable(), id);
-        if (ok) try { RadialMenu.persist(); } catch (Throwable ignored) {}
+        if (ok) {
+            try { RadialMenu.persist(); } catch (Throwable ignored) {}
+            fireChanged(MenuPath.root(), "removeById");
+            Constants.LOG.info("[{}] API removeById: id='{}'", Constants.MOD_NAME, id);
+        }
         return ok;
+    }
+
+    @Override
+    public boolean updateMeta(String id, String titleOrNull, String noteOrNull, IconSpec iconOrNull) {
+        if (id == null || id.isBlank()) return false;
+        List<MenuItem> root = RadialMenu.rootMutable();
+        Holder h = findParentAndItem(root, id);
+        if (h == null || h.item == null || h.parent == null || h.index < 0 || h.index >= h.parent.size()) return false;
+
+        MenuItem next = h.item;
+        if (titleOrNull != null) next = next.withTitle(titleOrNull);
+        if (noteOrNull != null) next = next.withNote(noteOrNull);
+        if (iconOrNull != null) next = next.withIcon(iconOrNull);
+        h.parent.set(h.index, next);
+        try { RadialMenu.persist(); } catch (Throwable ignored) {}
+        fireChanged(MenuPath.root(), "updateMeta");
+        Constants.LOG.info("[{}] API updateMeta: id='{}' titleChanged={} noteChanged={} iconChanged={}",
+                Constants.MOD_NAME, id, titleOrNull != null, noteOrNull != null, iconOrNull != null);
+        return true;
+    }
+
+    @Override
+    public boolean replaceAction(String id, IClickAction action) {
+        if (id == null || id.isBlank() || action == null) return false;
+        List<MenuItem> root = RadialMenu.rootMutable();
+        Holder h = findParentAndItem(root, id);
+        if (h == null || h.item == null || h.parent == null || h.index < 0 || h.index >= h.parent.size()) return false;
+        if (h.item.isCategory()) return false;
+        h.parent.set(h.index, h.item.withAction(action));
+        try { RadialMenu.persist(); } catch (Throwable ignored) {}
+        fireChanged(MenuPath.root(), "replaceAction");
+        Constants.LOG.info("[{}] API replaceAction: id='{}' type={}", Constants.MOD_NAME, id, action.getType());
+        return true;
+    }
+
+    @Override
+    public boolean setBundleFlags(String id, boolean hideFromMainRadial, boolean bundleKeybindEnabled) {
+        if (id == null || id.isBlank()) return false;
+        List<MenuItem> root = RadialMenu.rootMutable();
+        Holder h = findParentAndItem(root, id);
+        if (h == null || h.item == null || h.parent == null || h.index < 0 || h.index >= h.parent.size()) return false;
+        if (!h.item.isCategory()) return false;
+        MenuItem next = h.item
+                .withHideFromMainRadial(hideFromMainRadial)
+                .withBundleKeybindEnabled(bundleKeybindEnabled);
+        h.parent.set(h.index, next);
+        try { RadialMenu.persist(); } catch (Throwable ignored) {}
+        fireChanged(MenuPath.root(), "setBundleFlags");
+        Constants.LOG.info("[{}] API setBundleFlags: id='{}' hideFromMainRadial={} keybindEnabled={}",
+                Constants.MOD_NAME, id, hideFromMainRadial, bundleKeybindEnabled);
+        return true;
+    }
+
+    @Override
+    public boolean setLocked(String id, boolean locked) {
+        if (id == null || id.isBlank()) return false;
+        List<MenuItem> root = RadialMenu.rootMutable();
+        Holder h = findParentAndItem(root, id);
+        if (h == null || h.item == null || h.parent == null || h.index < 0 || h.index >= h.parent.size()) return false;
+        h.parent.set(h.index, h.item.withLocked(locked));
+        try { RadialMenu.persist(); } catch (Throwable ignored) {}
+        fireChanged(MenuPath.root(), "setLocked");
+        Constants.LOG.info("[{}] API setLocked: id='{}' locked={}", Constants.MOD_NAME, id, locked);
+        return true;
     }
 
     @Override
@@ -114,7 +248,16 @@ final class MenuWriteImpl implements MenuWrite {
             }
             if (found == null) {
                 // create the bundle
-                MenuItem cat = new MenuItem(freshId("bundle"), title, "", null, null, new ArrayList<>());
+                MenuItem cat = new MenuItem(
+                        freshId("bundle"),
+                        title,
+                        "",
+                        null,
+                        null,
+                        new ArrayList<>(),
+                        false,
+                        false
+                );
                 if (cur == null) {
                     Constants.LOG.warn("[{}] ensureBundles: no current list; aborting", Constants.MOD_NAME);
                     return createdAny;
@@ -127,7 +270,10 @@ final class MenuWriteImpl implements MenuWrite {
             }
         }
 
-        if (createdAny) try { RadialMenu.persist(); } catch (Throwable ignored) {}
+        if (createdAny) {
+            try { RadialMenu.persist(); } catch (Throwable ignored) {}
+            fireChanged(path, "ensureBundles");
+        }
         return createdAny;
     }
 
@@ -162,12 +308,23 @@ final class MenuWriteImpl implements MenuWrite {
                 } else {
                     // ensure id before adding
                     String gen = freshId("api");
-                    MenuItem withId = new MenuItem(gen, item.title(), item.note(), item.icon(), item.action(), item.children());
+                    MenuItem withId = new MenuItem(
+                            gen,
+                            item.titleComponent(),
+                            item.noteComponent(),
+                            item.icon(),
+                            item.action(),
+                            item.children(),
+                            item.hideFromMainRadial(),
+                            item.bundleKeybindEnabled(),
+                            item.locked()
+                    );
                     at.add(withId);
                     lastId = gen;
                 }
             }
             try { RadialMenu.persist(); } catch (Throwable ignored) {}
+            fireChanged(path, "upsertFromJson");
 
             return Optional.ofNullable(lastId);
         } catch (Throwable t) {
@@ -209,6 +366,16 @@ final class MenuWriteImpl implements MenuWrite {
         return prefix + "_" + Long.toHexString(t) + "_" + Integer.toHexString((int)(Math.random()*0xFFFF));
     }
     private static String safe(String s) { return s == null ? "" : s; }
+    private static String pathToString(MenuPath path) {
+        if (path == null || path.titles() == null || path.titles().isEmpty()) return "<root>";
+        return String.join("/", path.titles());
+    }
+
+    private void fireChanged(MenuPath path, String why) {
+        try {
+            if (events != null) events._fireChanged(path == null ? MenuPath.root() : path, why);
+        } catch (Throwable ignored) {}
+    }
 
     private static final class Holder {
         final List<MenuItem> parent; final int index; final MenuItem item;

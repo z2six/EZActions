@@ -6,12 +6,13 @@ import org.z2six.ezactions.Constants;
 
 /**
  * Simple icon descriptor.
- * Currently supports ITEM icons (rendered from an ItemStack).
- * Texture-based icons can be added later (TEXTURE type).
+ * Supports:
+ * - ITEM icons (rendered from an ItemStack)
+ * - CUSTOM icons loaded from config/ezactions/icons as 16x16 PNGs
  */
 public final class IconSpec {
 
-    public enum Kind { ITEM /*, TEXTURE */ }
+    public enum Kind { ITEM, CUSTOM }
 
     private final Kind kind;
     private final String id; // e.g., "minecraft:stone" for Kind.ITEM
@@ -23,6 +24,10 @@ public final class IconSpec {
 
     public static IconSpec item(String itemId) {
         return new IconSpec(Kind.ITEM, itemId);
+    }
+
+    public static IconSpec custom(String customId) {
+        return new IconSpec(Kind.CUSTOM, customId);
     }
 
     public Kind kind() { return kind; }

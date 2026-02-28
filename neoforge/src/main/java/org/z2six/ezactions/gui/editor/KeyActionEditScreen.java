@@ -1,10 +1,6 @@
-// src/main/java/org/z2six/ezactions/gui/editor/KeyActionEditScreen.java
-// MainFile: src/main/java/org/z2six/ezactions/gui/editor/KeyActionEditScreen.java
 package org.z2six.ezactions.gui.editor;
 
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -13,62 +9,23 @@ import org.z2six.ezactions.data.click.ClickActionKey;
 import org.z2six.ezactions.data.icon.IconSpec;
 import org.z2six.ezactions.data.menu.MenuItem;
 import org.z2six.ezactions.data.menu.RadialMenu;
-import org.z2six.ezactions.gui.IconRenderer;
 import org.z2six.ezactions.helper.InputInjector;
 
 import java.util.function.BiConsumer;
 
-/**
- * // MainFile: src/main/java/org/z2six/ezactions/gui/editor/KeyActionEditScreen.java
- *
- * Spacing rule per field row:
- *   Label
- *   10 px
- *   Field
- *   5 px
- *   (next Label)
- *
- * Buttons:
- *   - First button row starts 10 px after the element above it.
- *   - Each successive button row has 5 px vertical gap from the previous button row.
- *
- * Labels are drawn in render(); init() places widgets only.
- */
 public final class KeyActionEditScreen extends Screen {
 
-    /** Callback: (newItem, editingOrNull) -> void */
     @FunctionalInterface
-    public interface SaveHandler extends BiConsumer<MenuItem, MenuItem> { }
+    public interface SaveHandler extends BiConsumer<MenuItem, MenuItem> {}
 
-    // Field sizes
-    private static final int FIELD_W = 240;
-    private static final int FIELD_H = 20;
-
-    // Spacing rules (fields)
-    private static final int LABEL_TO_FIELD = 10;         // label -> field
-    private static final int FIELD_TO_NEXT_LABEL = 5;     // field -> next label
-
-    // Spacing rules (buttons)
-    private static final int FIRST_BUTTON_ROW_OFFSET = 10; // after last field to first button row
-    private static final int BETWEEN_BUTTON_ROWS = 5;      // between successive button rows
-
-    // New: text length limits (MC EditBox defaults to 32 if unset)
-    private static final int MAX_LEN_TITLE   = 128;
-    private static final int MAX_LEN_NOTE    = 512;
-
-    /**
-     * IMPORTANT:
-     * Keep this comfortably above any realistic mod keybind ids.
-     * (Some mods use long translation keys; 2048 is safe and still reasonable.)
-     */
+    private static final int MAX_LEN_TITLE = 128;
+    private static final int MAX_LEN_NOTE = 512;
     private static final int MAX_LEN_MAPPING = 2048;
 
-    // Construction
     private final Screen parent;
-    private final MenuItem editing;        // null => creating new
-    private final SaveHandler onSave;      // optional override
+    private final MenuItem editing;
+    private final SaveHandler onSave;
 
-    // Draft state (survives child pickers)
     private String draftTitle = "";
     private String draftNote = "";
     private String draftMapping = "";
@@ -76,79 +33,97 @@ public final class KeyActionEditScreen extends Screen {
     private InputInjector.DeliveryMode draftMode = InputInjector.DeliveryMode.AUTO;
     private IconSpec draftIcon = IconSpec.item("minecraft:stone");
 
-    // Widgets
     private EditBox titleBox;
     private EditBox noteBox;
     private EditBox mappingBox;
-    private CycleButton<InputInjector.DeliveryMode> modeCycle;
-    private CycleButton<Boolean> toggleCycle;
+    private EditorCycleButton<InputInjector.DeliveryMode> modeCycle;
+    private EditorCycleButton<Boolean> toggleCycle;
+    private final ActionEditorUi.ScrollArea scroll = new ActionEditorUi.ScrollArea();
 
-    public KeyActionEditScreen(Screen parent, MenuItem editing) { this(parent, editing, null); }
+    private ActionEditorUi.Panel panel;
+    private int bodyX;
+    private int bodyY;
+    private int bodyW;
+    private int bodyH;
+    private int cardBaseY;
+    private int cardBaseH;
+    private int iconX;
+    private int iconBaseY;
+
+    public KeyActionEditScreen(Screen parent, MenuItem editing) {
+        this(parent, editing, null);
+    }
 
     public KeyActionEditScreen(Screen parent, MenuItem editing, SaveHandler onSave) {
-        super(Component.literal(editing == null ? "Add Key Action" : "Edit Key Action"));
+        super(Component.translatable(editing == null
+                ? "ezactions.gui.key_action.title.add"
+                : "ezactions.gui.key_action.title.edit"));
         this.parent = parent;
         this.editing = editing;
         this.onSave = onSave;
 
         if (editing != null && editing.action() instanceof ClickActionKey ck) {
-            this.draftTitle   = safe(editing.title());
-            try { this.draftNote = safe(editing.note()); } catch (Throwable ignored) {}
+            this.draftTitle = safe(editing.title());
+            try {
+                this.draftNote = safe(editing.note());
+            } catch (Throwable ignored) {}
             this.draftMapping = safe(ck.mappingName());
-            this.draftToggle  = ck.toggle();
-            this.draftMode    = ck.mode();
-            IconSpec ic = editing.icon();
-            if (ic != null) this.draftIcon = ic;
+            this.draftToggle = ck.toggle();
+            this.draftMode = ck.mode();
+            if (editing.icon() != null) {
+                this.draftIcon = editing.icon();
+            }
         }
     }
 
-    private static String safe(String s) { return s == null ? "" : s; }
+    private static String safe(String s) {
+        return s == null ? "" : s;
+    }
 
     @Override
     protected void init() {
-        int cx = this.width / 2;
+        this.panel = ActionEditorUi.panel(this.width, this.height, 760, 420, 10);
+        this.scroll.reset();
 
-        // Place fields; labels are drawn in render() at (fieldY - LABEL_TO_FIELD)
-        int y = 52;
+        bodyX = panel.x() + 14;
+        bodyY = panel.y() + 34;
+        bodyW = panel.w() - 28;
+        bodyH = panel.h() - 42;
 
-        // Title field
-        titleBox = new EditBox(this.font, cx - (FIELD_W / 2), y, FIELD_W, FIELD_H, Component.literal("Title"));
+        int iconAreaW = 58;
+        int fieldW = Math.max(200, bodyW - iconAreaW - 14);
+        int fieldX = bodyX;
+
+        iconX = fieldX + fieldW + 18;
+        iconBaseY = bodyY + 26;
+
+        int y = bodyY + 18;
+
+        titleBox = new EditBox(this.font, fieldX, y, fieldW, 20, Component.translatable("ezactions.gui.field.title"));
         titleBox.setMaxLength(MAX_LEN_TITLE);
+        titleBox.setHint(Component.translatable("ezactions.gui.key_action.hint.title"));
         titleBox.setValue(draftTitle);
-        titleBox.setHint(Component.literal("Title (e.g., Inventory)"));
         titleBox.setResponder(s -> draftTitle = safe(s));
-        addRenderableWidget(titleBox);
-        y += FIELD_H + FIELD_TO_NEXT_LABEL + LABEL_TO_FIELD;
+        scroll.track(addRenderableWidget(titleBox));
+        y += 30;
 
-        // Note field
-        noteBox = new EditBox(this.font, cx - (FIELD_W / 2), y, FIELD_W, FIELD_H, Component.literal("Note"));
+        noteBox = new EditBox(this.font, fieldX, y, fieldW, 20, Component.translatable("ezactions.gui.field.note"));
         noteBox.setMaxLength(MAX_LEN_NOTE);
+        noteBox.setHint(Component.translatable("ezactions.gui.hint.note_optional"));
         noteBox.setValue(draftNote);
-        noteBox.setHint(Component.literal("Optional note (tooltip in editor)"));
         noteBox.setResponder(s -> draftNote = safe(s));
-        addRenderableWidget(noteBox);
-        y += FIELD_H + FIELD_TO_NEXT_LABEL + LABEL_TO_FIELD;
+        scroll.track(addRenderableWidget(noteBox));
+        y += 30;
 
-        // Mapping field
-        mappingBox = new EditBox(this.font, cx - (FIELD_W / 2), y, FIELD_W, FIELD_H, Component.literal("Mapping Name"));
-
-        // Set max length BEFORE value, and keep a comfortable ceiling.
+        mappingBox = new EditBox(this.font, fieldX, y, fieldW, 20, Component.translatable("ezactions.gui.field.mapping_name"));
         mappingBox.setMaxLength(MAX_LEN_MAPPING);
+        mappingBox.setHint(Component.translatable("ezactions.gui.key_action.hint.mapping"));
         mappingBox.setValue(draftMapping);
-        mappingBox.setHint(Component.literal("KeyMapping id (e.g., key.inventory)"));
         wireMappingResponder();
-        addRenderableWidget(mappingBox);
-        y += FIELD_H;
+        scroll.track(addRenderableWidget(mappingBox));
+        y += 30;
 
-        Constants.LOG.debug("[{}] KeyActionEdit: max lengths set (title={}, note={}, mapping={}).",
-                Constants.MOD_NAME, MAX_LEN_TITLE, MAX_LEN_NOTE, MAX_LEN_MAPPING);
-
-        // --- Button rows stack ---
-        // 1) First button row starts 10px after last field
-        y += FIRST_BUTTON_ROW_OFFSET;
-
-        // Row 1: keybind picker button
-        addRenderableWidget(Button.builder(Component.literal("Pick from Keybinds…"), b -> {
+        scroll.track(addRenderableWidget(ActionEditorUi.button(fieldX, y, fieldW, 20, Component.translatable("ezactions.gui.key_action.pick_keybind"), () -> {
             try {
                 this.minecraft.setScreen(new KeybindPickerScreen(this, mapping -> {
                     try {
@@ -161,88 +136,81 @@ public final class KeyActionEditScreen extends Screen {
             } catch (Throwable t) {
                 Constants.LOG.warn("[{}] KeyActionEdit: opening KeybindPickerScreen failed: {}", Constants.MOD_NAME, t.toString());
             }
-        }).bounds(cx - (FIELD_W / 2), y, FIELD_W, FIELD_H).build());
-        y += FIELD_H + BETWEEN_BUTTON_ROWS;
+        })));
+        y += 30;
 
-        // Row 2: icon picker button
-        addRenderableWidget(Button.builder(Component.literal("Choose Icon"), b -> {
-            try {
-                this.minecraft.setScreen(new IconPickerScreen(this, ic -> {
-                    draftIcon = ic == null ? IconSpec.item("minecraft:stone") : ic;
-                    this.minecraft.setScreen(this);
-                }));
-            } catch (Throwable t) {
-                Constants.LOG.warn("[{}] KeyActionEdit: opening IconPickerScreen failed: {}", Constants.MOD_NAME, t.toString());
-            }
-        }).bounds(cx - (FIELD_W / 2), y, FIELD_W, FIELD_H).build());
-        y += FIELD_H + BETWEEN_BUTTON_ROWS;
+        modeCycle = scroll.track(addRenderableWidget(ActionEditorUi.cycleButton(
+                fieldX,
+                y,
+                (fieldW / 2) - 3,
+                20,
+                Component.translatable("ezactions.gui.key_action.delivery"),
+                draftMode,
+                dm -> Component.translatable("ezactions.gui.common.delivery_mode." + (dm == null ? "auto" : dm.name().toLowerCase(java.util.Locale.ROOT))),
+                dm -> draftMode = dm == null ? InputInjector.DeliveryMode.AUTO : dm,
+                InputInjector.DeliveryMode.AUTO,
+                InputInjector.DeliveryMode.INPUT,
+                InputInjector.DeliveryMode.TICK
+        )));
 
-        // Row 3: delivery + toggle on one row (same row height as field)
-        modeCycle = addRenderableWidget(
-                CycleButton.builder((InputInjector.DeliveryMode dm) -> Component.literal(dm.name()))
-                        .withValues(InputInjector.DeliveryMode.AUTO, InputInjector.DeliveryMode.INPUT, InputInjector.DeliveryMode.TICK)
-                        .withInitialValue(draftMode)
-                        .create(cx - (FIELD_W / 2), y, (FIELD_W / 2) - 4, FIELD_H, Component.literal("Delivery"))
-        );
-        toggleCycle = addRenderableWidget(
-                CycleButton.onOffBuilder(draftToggle)
-                        .create(cx + 4, y, (FIELD_W / 2) - 4, FIELD_H, Component.literal("Toggle"))
-        );
-        y += FIELD_H + BETWEEN_BUTTON_ROWS;
+        toggleCycle = scroll.track(addRenderableWidget(ActionEditorUi.cycleButton(
+                fieldX + (fieldW / 2) + 3,
+                y,
+                (fieldW / 2) - 3,
+                20,
+                Component.translatable("ezactions.gui.key_action.toggle"),
+                draftToggle,
+                v -> Component.translatable(Boolean.TRUE.equals(v) ? "ezactions.gui.common.toggle.on" : "ezactions.gui.common.toggle.off"),
+                v -> draftToggle = Boolean.TRUE.equals(v),
+                Boolean.TRUE,
+                Boolean.FALSE
+        )));
+        y += 34;
 
-        // Row 4: Save / Cancel / Back
-        int totalW = (80 * 3) + (8 * 2);
-        int leftX = cx - (totalW / 2);
-        addRenderableWidget(Button.builder(Component.literal("Save"), b -> onSavePressed())
-                .bounds(leftX, y, 80, FIELD_H).build());
-        addRenderableWidget(Button.builder(Component.literal("Cancel"), b -> onClose())
-                .bounds(leftX + 80 + 8, y, 80, FIELD_H).build());
-        addRenderableWidget(Button.builder(Component.literal("Back"), b -> this.minecraft.setScreen(parent))
-                .bounds(leftX + 2 * (80 + 8), y, 80, FIELD_H).build());
-        // --- end button stack ---
+        int buttonY = y;
+        int totalW = (96 * 3) + (8 * 2);
+        int left = panel.x() + (panel.w() - totalW) / 2;
+        cardBaseY = bodyY;
+        cardBaseH = (buttonY - bodyY) + 34;
+
+        scroll.track(addRenderableWidget(ActionEditorUi.button(left, buttonY, 96, 20, Component.translatable("ezactions.gui.common.save"), this::onSavePressed)));
+        scroll.track(addRenderableWidget(ActionEditorUi.button(left + 104, buttonY, 96, 20, Component.translatable("ezactions.gui.common.cancel"), this::onClose)));
+        scroll.track(addRenderableWidget(ActionEditorUi.button(left + 208, buttonY, 96, 20, Component.translatable("ezactions.gui.common.back"), () -> this.minecraft.setScreen(parent))));
+
+        scroll.include(bodyY, bodyY + cardBaseH);
+        scroll.layout(bodyY, bodyY + bodyH);
     }
 
-    /**
-     * Responder wiring for mapping field.
-     * Kept as a method so we can temporarily disable responder while setting programmatically.
-     */
     private void wireMappingResponder() {
-        if (mappingBox == null) return;
+        if (mappingBox == null) {
+            return;
+        }
         mappingBox.setResponder(s -> draftMapping = safe(s));
     }
 
-    /**
-     * Apply mapping selected from KeybindPickerScreen.
-     *
-     * Fixes the historic "default 32 chars" truncation class of bugs by:
-     * - ensuring mappingBox max length is at least the incoming string length before setValue()
-     * - preventing responder re-entrancy from overwriting draftMapping with a truncated value
-     */
     private void applyPickedMapping(String mapping) {
-        if (mapping == null) return;
+        if (mapping == null) {
+            return;
+        }
         String m = safe(mapping).trim();
-        if (m.isEmpty()) return;
+        if (m.isEmpty()) {
+            return;
+        }
 
-        // Always keep the full chosen mapping in our draft state.
         this.draftMapping = m;
 
         if (mappingBox != null) {
             try {
-                // Defensive: ensure box max length cannot be the default 32 at this moment.
                 int need = Math.max(MAX_LEN_MAPPING, m.length());
-
-                // Temporarily disable responder so a clamped setValue can't overwrite draftMapping.
                 mappingBox.setResponder(s -> {});
                 mappingBox.setMaxLength(need);
                 mappingBox.setValue(m);
                 wireMappingResponder();
-
-                Constants.LOG.debug("[{}] KeyActionEdit: applied picked mapping (len={}, boxMax>=len={}).",
-                        Constants.MOD_NAME, m.length(), need);
             } catch (Throwable t) {
                 Constants.LOG.warn("[{}] KeyActionEdit: failed applying picked mapping to box: {}", Constants.MOD_NAME, t.toString());
-                // draftMapping already updated; box may be stale but save will still prefer draftMapping.
-                try { wireMappingResponder(); } catch (Throwable ignored) {}
+                try {
+                    wireMappingResponder();
+                } catch (Throwable ignored) {}
             }
         }
     }
@@ -251,41 +219,34 @@ public final class KeyActionEditScreen extends Screen {
         String a = safe(fromBox).trim();
         String b = safe(fromDraft).trim();
 
-        if (a.isEmpty() && b.isEmpty()) return "";
-        if (a.isEmpty()) return b;
-        if (b.isEmpty()) return a;
-
-        if (a.equals(b)) return a;
-
-        // Prefer the longer one; this fixes "picker value got clamped in the EditBox".
-        if (b.length() > a.length()) return b;
-        if (a.length() > b.length()) return a;
-
-        // Same length but different; prefer box (latest user-visible value).
+        if (a.isEmpty() && b.isEmpty()) {
+            return "";
+        }
+        if (a.isEmpty()) {
+            return b;
+        }
+        if (b.isEmpty()) {
+            return a;
+        }
+        if (a.equals(b)) {
+            return a;
+        }
+        if (b.length() > a.length()) {
+            return b;
+        }
+        if (a.length() > b.length()) {
+            return a;
+        }
         return a;
     }
 
     private void onSavePressed() {
         try {
-            draftTitle   = safe(titleBox == null ? draftTitle : titleBox.getValue()).trim();
-            draftNote    = safe(noteBox  == null ? draftNote  : noteBox.getValue()).trim();
+            draftTitle = safe(titleBox == null ? draftTitle : titleBox.getValue()).trim();
+            draftNote = safe(noteBox == null ? draftNote : noteBox.getValue()).trim();
 
             String boxMapping = safe(mappingBox == null ? "" : mappingBox.getValue());
-            String chosenMapping = chooseBestMapping(boxMapping, draftMapping);
-
-            // If we detect mismatch, log it to help future diagnostics.
-            if (!safe(boxMapping).trim().equals(safe(draftMapping).trim())) {
-                Constants.LOG.debug("[{}] KeyActionEdit: mapping mismatch on save (boxLen={}, draftLen={}, chosenLen={}). box='{}' draft='{}'.",
-                        Constants.MOD_NAME,
-                        safe(boxMapping).trim().length(),
-                        safe(draftMapping).trim().length(),
-                        chosenMapping.length(),
-                        safe(boxMapping).trim(),
-                        safe(draftMapping).trim()
-                );
-            }
-
-            draftMapping = chosenMapping;
+            draftMapping = chooseBestMapping(boxMapping, draftMapping);
 
             draftMode = modeCycle == null ? draftMode : modeCycle.getValue();
             draftToggle = toggleCycle != null && Boolean.TRUE.equals(toggleCycle.getValue());
@@ -295,7 +256,6 @@ public final class KeyActionEditScreen extends Screen {
                 return;
             }
 
-            // Assumes MenuItem supports a 'note' field
             MenuItem newItem = new MenuItem(
                     editing != null ? editing.id() : MenuEditorScreen.freshId("key"),
                     draftTitle,
@@ -318,6 +278,7 @@ public final class KeyActionEditScreen extends Screen {
             if (!ok) {
                 Constants.LOG.info("[{}] Page full or replace failed for '{}'.", Constants.MOD_NAME, newItem.title());
             }
+
             this.minecraft.setScreen(parent);
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] KeyActionEdit onSave failed: {}", Constants.MOD_NAME, t.toString());
@@ -326,53 +287,81 @@ public final class KeyActionEditScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        // Background
-        g.fill(0, 0, this.width, this.height, 0x88000000);
-        g.fill(12, 52, this.width - 12, this.height - 36, 0xC0101010);
+        ActionEditorUi.drawFrame(g, this.font, this.width, this.height, panel, this.title);
+        scroll.layout(bodyY, bodyY + bodyH);
+        ActionEditorUi.drawCard(g, this.font, bodyX, scroll.y(cardBaseY), bodyW, cardBaseH, Component.empty());
 
-        g.drawCenteredString(this.font, this.title.getString(), this.width / 2, 20, 0xFFFFFF);
-
-        // Labels: draw at (fieldY - LABEL_TO_FIELD)
         if (titleBox != null) {
-            g.drawString(this.font, "Title:", titleBox.getX(), titleBox.getY() - LABEL_TO_FIELD, 0xA0A0A0);
+            ActionEditorUi.drawFieldLabel(g, this.font, Component.translatable("ezactions.gui.field.title"), titleBox.getX(), titleBox.getY() - 10);
         }
         if (noteBox != null) {
-            g.drawString(this.font, "Note:", noteBox.getX(), noteBox.getY() - LABEL_TO_FIELD, 0xA0A0A0);
+            ActionEditorUi.drawFieldLabel(g, this.font, Component.translatable("ezactions.gui.field.note"), noteBox.getX(), noteBox.getY() - 10);
         }
         if (mappingBox != null) {
-            g.drawString(this.font, "Mapping Name:", mappingBox.getX(), mappingBox.getY() - LABEL_TO_FIELD, 0xA0A0A0);
+            ActionEditorUi.drawFieldLabel(g, this.font, Component.translatable("ezactions.gui.field.mapping_name"), mappingBox.getX(), mappingBox.getY() - 10);
         }
 
-        // Icon preview (top-right)
-        try {
-            IconRenderer.drawIcon(g, this.width - 28, 28, this.draftIcon);
-        } catch (Throwable ignored) {}
+        ActionEditorUi.drawIconCard(g, this.font, iconX, scroll.y(iconBaseY), 32, Component.translatable("ezactions.gui.field.icon"), this.draftIcon, iconHit(mouseX, mouseY));
+        scroll.drawScrollbar(g, bodyX, bodyY, bodyW, bodyH);
 
-        // Tooltip for long mapping names so they don't LOOK "trimmed" in the UI.
-        // This does not change stored values; it only improves visibility.
-        try {
-            if (mappingBox != null) {
-                int bx = mappingBox.getX();
-                int by = mappingBox.getY();
-                int bw = mappingBox.getWidth();
-                int bh = mappingBox.getHeight();
-                boolean over = mouseX >= bx && mouseX < bx + bw && mouseY >= by && mouseY < by + bh;
-                if (over) {
-                    String val = safe(mappingBox.getValue()).trim();
-                    if (!val.isEmpty()) {
-                        int textW = this.font.width(val);
-                        int visibleW = Math.max(1, bw - 8);
-                        if (textW > visibleW) {
-                            g.renderTooltip(this.font, Component.literal(val), mouseX, mouseY);
-                        }
-                    }
+        if (mappingBox != null) {
+            int mbx = mappingBox.getX();
+            int mby = mappingBox.getY();
+            int mbw = mappingBox.getWidth();
+            int mbh = mappingBox.getHeight();
+            boolean over = mouseX >= mbx && mouseX < mbx + mbw && mouseY >= mby && mouseY < mby + mbh;
+            if (over) {
+                String val = safe(mappingBox.getValue()).trim();
+                if (!val.isEmpty() && this.font.width(val) > Math.max(1, mbw - 8)) {
+                    g.renderTooltip(this.font, Component.literal(val), mouseX, mouseY);
                 }
             }
-        } catch (Throwable ignored) {}
+        }
 
         super.render(g, mouseX, mouseY, partialTick);
     }
 
-    @Override public boolean isPauseScreen() { return false; }
-    @Override public void onClose() { this.minecraft.setScreen(parent); }
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 0 && iconHit(mouseX, mouseY)) {
+            openIconPicker();
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
+        if (scroll.mouseScrolled(mouseX, mouseY, deltaY, bodyX, bodyY, bodyW, bodyH)) {
+            scroll.layout(bodyY, bodyY + bodyH);
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, deltaX, deltaY);
+    }
+
+    @Override
+    public boolean isPauseScreen() {
+        return false;
+    }
+
+    @Override
+    public void onClose() {
+        this.minecraft.setScreen(parent);
+    }
+
+    private void openIconPicker() {
+        try {
+            this.minecraft.setScreen(new IconPickerScreen(this, ic -> {
+                draftIcon = ic == null ? IconSpec.item("minecraft:stone") : ic;
+                this.minecraft.setScreen(this);
+            }));
+        } catch (Throwable t) {
+            Constants.LOG.warn("[{}] KeyActionEdit: opening IconPickerScreen failed: {}", Constants.MOD_NAME, t.toString());
+        }
+    }
+
+    private boolean iconHit(double mouseX, double mouseY) {
+        int y = scroll.y(iconBaseY);
+        return mouseX >= iconX && mouseX <= iconX + 32 && mouseY >= y && mouseY <= y + 32;
+    }
 }

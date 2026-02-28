@@ -63,6 +63,7 @@ public final class ConfigIO {
 
                 // Matches your spec structure: push("general")
                 cfg.set("general.moveWhileRadialOpen", GeneralClientConfig.CONFIG.moveWhileRadialOpen.get());
+                cfg.set("general.showRadialHoverLabel", GeneralClientConfig.CONFIG.showRadialHoverLabel.get());
                 cfg.set("general.commandEditorVisibleLines", GeneralClientConfig.CONFIG.commandEditorVisibleLines.get());
 
                 cfg.save();
@@ -88,6 +89,9 @@ public final class ConfigIO {
                 cfg.set("animations.animHover", RadialAnimConfig.CONFIG.animHover.get());
                 cfg.set("animations.hoverGrowPct", RadialAnimConfig.CONFIG.hoverGrowPct.get());
                 cfg.set("animations.openCloseMs", RadialAnimConfig.CONFIG.openCloseMs.get());
+                cfg.set("animations.openStyle", RadialAnimConfig.CONFIG.openStyle.get());
+                cfg.set("animations.openDirection", RadialAnimConfig.CONFIG.openDirection.get());
+                cfg.set("animations.hoverStyle", RadialAnimConfig.CONFIG.hoverStyle.get());
 
                 cfg.save();
             }
@@ -114,6 +118,10 @@ public final class ConfigIO {
                 cfg.set("scalePerItem", DesignClientConfig.scalePerItem.get());
                 cfg.set("ringColor", DesignClientConfig.ringColor.get());
                 cfg.set("hoverColor", DesignClientConfig.hoverColor.get());
+                cfg.set("borderColor", DesignClientConfig.borderColor.get());
+                cfg.set("textColor", DesignClientConfig.textColor.get());
+                cfg.set("sliceGapDeg", DesignClientConfig.sliceGapDeg.get());
+                cfg.set("designStyle", DesignClientConfig.designStyle.get());
 
                 cfg.save();
             }

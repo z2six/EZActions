@@ -15,6 +15,7 @@ import org.z2six.ezactions.data.menu.RadialMenu;
 import org.z2six.ezactions.gui.RadialMenuScreen;
 import org.z2six.ezactions.helper.ClientTaskQueue;
 import org.z2six.ezactions.helper.InputInjector;
+import org.z2six.ezactions.helper.ItemEquipExecutor;
 import org.z2six.ezactions.helper.KeyboardHandlerHelper;
 import org.z2six.ezactions.util.BundleHotkeyManager;
 import org.z2six.ezactions.util.CommandSequencer;
@@ -46,6 +47,7 @@ public final class KeyboardHandler {
     private static boolean contextsPushed = false;
     private static KeyMapping[] trackedKeys = null;
     private static IKeyConflictContext[] prevContexts = null;
+    private static long nextRestartNoticeCheckAtMs = 0L;
 
     /** Called by RadialMenuScreen when it executes an action on release. */
     public static void suppressReopenUntilReleased() {
@@ -59,6 +61,12 @@ public final class KeyboardHandler {
 
             final Minecraft mc = Minecraft.getInstance();
             if (mc == null || mc.player == null) return;
+
+            long now = System.currentTimeMillis();
+            if (now >= nextRestartNoticeCheckAtMs) {
+                nextRestartNoticeCheckAtMs = now + 3000L;
+                BundleHotkeyManager.notifyRestartRequiredIfNeeded("tick");
+            }
 
             // --- Determine which "open radial" hotkey (if any) is currently physically DOWN ---
 
@@ -97,7 +105,7 @@ public final class KeyboardHandler {
                 if (mc.screen instanceof RadialMenuScreen s) {
                     s.onHotkeyReleased();
                 }
-                releaseMovementKeys(mc);
+                syncMovementKeysToPhysical(mc);
                 popMovementKeyContexts(mc);
                 suppressUntilRelease = false;
             }
@@ -138,6 +146,8 @@ public final class KeyboardHandler {
 
             // NEW: run sequenced multi-commands (cheap no-op when idle)
             CommandSequencer.tickClient();
+            // Item-equip background executor (cancel/replace semantics handled internally)
+            ItemEquipExecutor.tickClient();
 
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] Exception during onClientTickPost: {}", Constants.MOD_NAME, t.toString());
@@ -201,17 +211,17 @@ public final class KeyboardHandler {
         InputInjector.setKeyPressed(km, down);
     }
 
-    private static void releaseMovementKeys(Minecraft mc) {
+    private static void syncMovementKeysToPhysical(Minecraft mc) {
         try {
             final Options o = mc.options;
             if (o == null) return;
-            InputInjector.setKeyPressed(o.keyUp, false);
-            InputInjector.setKeyPressed(o.keyDown, false);
-            InputInjector.setKeyPressed(o.keyLeft, false);
-            InputInjector.setKeyPressed(o.keyRight, false);
-            InputInjector.setKeyPressed(o.keyJump, false);
-            InputInjector.setKeyPressed(o.keySprint, false);
-            InputInjector.setKeyPressed(o.keyShift, false);
+            mirrorKey(mc, o.keyUp);
+            mirrorKey(mc, o.keyDown);
+            mirrorKey(mc, o.keyLeft);
+            mirrorKey(mc, o.keyRight);
+            mirrorKey(mc, o.keyJump);
+            mirrorKey(mc, o.keySprint);
+            mirrorKey(mc, o.keyShift);
         } catch (Throwable ignored) {}
     }
 

@@ -9,6 +9,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import org.z2six.ezactions.Constants;
 import org.z2six.ezactions.data.icon.IconSpec;
+import org.z2six.ezactions.util.CustomIconManager;
 
 /**
  * Renders IconSpec to the screen. Currently supports ITEM icons.
@@ -28,6 +29,14 @@ public final class IconRenderer {
                 case ITEM -> {
                     Item item = resolveItem(icon.id());
                     drawItem(g, x, y, new ItemStack(item));
+                }
+                case CUSTOM -> {
+                    ResourceLocation tex = CustomIconManager.textureForId(icon.id());
+                    if (tex != null) {
+                        g.blit(tex, x - 8, y - 8, 0.0f, 0.0f, 16, 16, 16, 16);
+                    } else {
+                        drawItem(g, x, y, new ItemStack(getFallbackItem()));
+                    }
                 }
                 default -> drawItem(g, x, y, new ItemStack(getFallbackItem()));
             }

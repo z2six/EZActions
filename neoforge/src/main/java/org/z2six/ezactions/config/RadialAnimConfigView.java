@@ -17,6 +17,9 @@ public final class RadialAnimConfigView {
     public final boolean animHover;
     public final double  hoverGrowPct;
     public final int     openCloseMs;
+    public final String  openStyle;
+    public final String  openDirection;
+    public final String  hoverStyle;
 
     public static RadialAnimConfigView get() {
         return new RadialAnimConfigView();
@@ -26,6 +29,9 @@ public final class RadialAnimConfigView {
         boolean ae = true, aoc = true, ah = true;
         double  hgp = 0.05D;
         int     ocm = 250;
+        String  os = "WIPE";
+        String  od = "CW";
+        String  hs = "FILL_SCALE";
 
         try {
             RadialAnimConfig c = RadialAnimConfig.CONFIG;
@@ -34,6 +40,9 @@ public final class RadialAnimConfigView {
             ah  = c.animHover();
             hgp = c.hoverGrowPct();
             ocm = c.openCloseMs();
+            os  = c.openStyle();
+            od  = c.openDirection();
+            hs  = c.hoverStyle();
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] RadialAnimConfigView: defaults in use ({}).", Constants.MOD_NAME, t.toString());
         }
@@ -43,5 +52,8 @@ public final class RadialAnimConfigView {
         this.animHover         = ah;
         this.hoverGrowPct      = hgp;
         this.openCloseMs       = ocm;
+        this.openStyle         = os;
+        this.openDirection     = od;
+        this.hoverStyle        = hs;
     }
 }

@@ -65,11 +65,11 @@ public final class MenuImportExport {
             }
 
             Constants.LOG.info("[{}] Exported {} menu items to clipboard.", Constants.MOD_NAME, arr.size());
-            safeStatusMessage("Exported " + arr.size() + " items to clipboard.");
+            safeStatusMessage(Component.translatable("ezactions.message.export_success", arr.size()));
             return arr.size();
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] Export failed: {}", Constants.MOD_NAME, t.toString());
-            safeStatusMessage("Export failed (see log).");
+            safeStatusMessage(Component.translatable("ezactions.message.export_failed"));
             return -1;
         }
     }
@@ -85,7 +85,7 @@ public final class MenuImportExport {
             String text = ClipboardIO.getClipboard();
             if (text == null || text.trim().isEmpty()) {
                 Constants.LOG.info("[{}] Import: clipboard empty.", Constants.MOD_NAME);
-                safeStatusMessage("Clipboard is empty.");
+                safeStatusMessage(Component.translatable("ezactions.message.clipboard_empty"));
                 return -1;
             }
 
@@ -94,13 +94,13 @@ public final class MenuImportExport {
                 rootEl = com.google.gson.JsonParser.parseString(text);
             } catch (Throwable parseEx) {
                 Constants.LOG.info("[{}] Import: clipboard not JSON: {}", Constants.MOD_NAME, parseEx.toString());
-                safeStatusMessage("Clipboard doesn't contain JSON.");
+                safeStatusMessage(Component.translatable("ezactions.message.clipboard_not_json"));
                 return -1;
             }
 
             if (!rootEl.isJsonArray()) {
                 Constants.LOG.info("[{}] Import: root must be an array.", Constants.MOD_NAME);
-                safeStatusMessage("Import failed: root JSON is not an array.");
+                safeStatusMessage(Component.translatable("ezactions.message.import_root_not_array"));
                 return -1;
             }
 
@@ -113,7 +113,7 @@ public final class MenuImportExport {
                 idx++;
                 if (!el.isJsonObject()) {
                     Constants.LOG.info("[{}] Import: entry #{} is not an object, aborting.", Constants.MOD_NAME, idx);
-                    safeStatusMessage("Import failed: entry #" + idx + " not an object.");
+                    safeStatusMessage(Component.translatable("ezactions.message.import_entry_not_object", idx));
                     return -1;
                 }
                 JsonObject obj = el.getAsJsonObject();
@@ -123,7 +123,7 @@ public final class MenuImportExport {
                     fresh.add(mi);
                 } catch (Throwable t) {
                     Constants.LOG.info("[{}] Import: entry #{} invalid: {}", Constants.MOD_NAME, idx, t.toString());
-                    safeStatusMessage("Import failed: entry #" + idx + " invalid.");
+                    safeStatusMessage(Component.translatable("ezactions.message.import_entry_invalid", idx));
                     return -1;
                 }
             }
@@ -136,28 +136,28 @@ public final class MenuImportExport {
                 RadialMenu.persist();
             } catch (Throwable t) {
                 Constants.LOG.warn("[{}] Import: failed to persist: {}", Constants.MOD_NAME, t.toString());
-                safeStatusMessage("Import failed while saving.");
+                safeStatusMessage(Component.translatable("ezactions.message.import_failed_saving"));
                 return -1;
             }
 
             Constants.LOG.info("[{}] Imported {} items from clipboard.", Constants.MOD_NAME, fresh.size());
-            safeStatusMessage("Imported " + fresh.size() + " items from clipboard.");
+            safeStatusMessage(Component.translatable("ezactions.message.import_success", fresh.size()));
             return fresh.size();
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] Import failed: {}", Constants.MOD_NAME, t.toString());
-            safeStatusMessage("Import failed (see log).");
+            safeStatusMessage(Component.translatable("ezactions.message.import_failed"));
             return -1;
         }
     }
 
     // --- UI feedback (non-fatal if MC not ready) ----------------------------
 
-    private static void safeStatusMessage(String msg) {
+    private static void safeStatusMessage(Component msg) {
         try {
             Minecraft mc = Minecraft.getInstance();
             if (mc != null && mc.gui != null) {
                 // Small unobtrusive status line (top-right overlay alternative)
-                mc.gui.setOverlayMessage(Component.literal(msg), false);
+                mc.gui.setOverlayMessage(msg, false);
             }
         } catch (Throwable ignored) {
             // last-resort: nothing; logs are already written above

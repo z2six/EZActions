@@ -3,7 +3,6 @@ package org.z2six.ezactions.gui.editor;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -17,6 +16,7 @@ import org.z2six.ezactions.data.menu.RadialMenu;
 import org.z2six.ezactions.gui.editor.menu.MenuNavUtil;
 import org.z2six.ezactions.gui.editor.menu.Rows;
 import org.z2six.ezactions.gui.editor.menu.ScrollbarMath;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -62,7 +62,7 @@ public final class MenuEditorScreen extends Screen {
     private static final int SB_KNOB_MINH = 20;
 
     // Bookmark symbol (unicode). If the glyph isn't present, it will render as tofu but still occupy width.
-    private static final String BOOKMARK_SYM = "§6🔖§r"; // gold "bookmark" + reset
+    private static final String BOOKMARK_SYM = "*";
     private static final int BOOKMARK_PAD_RIGHT = 4;     // padding between symbol and title
 
     // Construction
@@ -70,16 +70,17 @@ public final class MenuEditorScreen extends Screen {
 
     // UI state
     private EditBox filterBox;
-    private Button btnAddKey;
-    private Button btnAddCmd;
-    private Button btnAddCat;
-    private Button btnEdit;
-    private Button btnRemove;
+    private EditorButton btnAddKey;
+    private EditorButton btnAddCmd;
+    private EditorButton btnAddEquip;
+    private EditorButton btnAddCat;
+    private EditorButton btnEdit;
+    private EditorButton btnRemove;
 
-    private Button btnImport;
-    private Button btnExport;
-    private Button btnClose;
-    private Button btnConfig; // NEW
+    private EditorButton btnImport;
+    private EditorButton btnExport;
+    private EditorButton btnClose;
+    private EditorButton btnConfig; // NEW
 
     // List geometry
     private int listLeft, listTop, listWidth, listHeight;
@@ -113,7 +114,7 @@ public final class MenuEditorScreen extends Screen {
     public MenuEditorScreen() { this(null); }
 
     public MenuEditorScreen(Screen parent) {
-        super(Component.literal("EZ Actions - Menu Editor"));
+        super(Component.translatable("ezactions.gui.menu_editor.title"));
         this.parent = parent;
     }
 
@@ -183,7 +184,10 @@ public final class MenuEditorScreen extends Screen {
                 rows.add(new Rows.ItemRow(mi));
             } else {
                 String title = mi.title() == null ? "" : mi.title();
-                if (title.toLowerCase(Locale.ROOT).contains(q)) {
+                String type = typeSearchToken(mi);
+                String note = safeNote(mi);
+                String hay = (title + " " + type + " " + (note == null ? "" : note)).toLowerCase(Locale.ROOT);
+                if (hay.contains(q)) {
                     rows.add(new Rows.ItemRow(mi));
                 }
             }
@@ -263,6 +267,53 @@ public final class MenuEditorScreen extends Screen {
         return -1;
     }
 
+    private static String typeSearchToken(MenuItem mi) {
+        if (mi == null) return "";
+        if (mi.isCategory()) return "bundle category";
+        try {
+            IClickAction act = mi.action();
+            if (act == null || act.getType() == null) return "action";
+            String raw = act.getType().name().toLowerCase(Locale.ROOT).replace('_', ' ');
+            return raw + " action";
+        } catch (Throwable ignored) {
+            return "action";
+        }
+    }
+
+    private static Component typeLabel(MenuItem mi) {
+        if (mi == null || mi.isCategory()) {
+            return Component.translatable("ezactions.menu.type.bundle");
+        }
+        try {
+            IClickAction act = mi.action();
+            if (act == null || act.getType() == null) {
+                return Component.translatable("ezactions.menu.type.action");
+            }
+            return Component.translatable("ezactions.action.type." + act.getType().name().toLowerCase(Locale.ROOT));
+        } catch (Throwable ignored) {
+            return Component.translatable("ezactions.menu.type.action");
+        }
+    }
+
+    private static String localizeBreadcrumbPath(String rawPath) {
+        if (rawPath == null || rawPath.isEmpty()) {
+            return Component.translatable("ezactions.common.root").getString();
+        }
+        String[] parts = rawPath.split("/");
+        if (parts.length == 0) {
+            return rawPath;
+        }
+        if ("root".equalsIgnoreCase(parts[0])) {
+            parts[0] = Component.translatable("ezactions.common.root").getString();
+        }
+        for (int i = 0; i < parts.length; i++) {
+            if ("(unnamed)".equalsIgnoreCase(parts[i])) {
+                parts[i] = Component.translatable("ezactions.common.unnamed").getString();
+            }
+        }
+        return String.join("/", parts);
+    }
+
     // --- Screen lifecycle ----------------------------------------------------
 
     @Override
@@ -277,14 +328,14 @@ public final class MenuEditorScreen extends Screen {
         int y = top;
 
         // Filter
-        filterBox = new EditBox(this.font, x, y, LEFT_W, 20, Component.literal("Filter"));
-        filterBox.setHint(Component.literal("Filter…"));
+        filterBox = new EditBox(this.font, x, y, LEFT_W, 20, Component.translatable("ezactions.gui.field.filter"));
+        filterBox.setHint(Component.translatable("ezactions.gui.menu_editor.hint.filter"));
         filterBox.setResponder(s -> rebuildRows());
         addRenderableWidget(filterBox);
         y += 24;
 
         // Add Key
-        btnAddKey = Button.builder(Component.literal("Add Key Action"), b -> {
+        btnAddKey = ActionEditorUi.button(x, y, LEFT_W, 20, Component.translatable("ezactions.gui.menu_editor.add_key_action"), () -> {
             var parent = this;
             this.minecraft.setScreen(new KeyActionEditScreen(
                     parent, null,
@@ -313,32 +364,37 @@ public final class MenuEditorScreen extends Screen {
                         }
                     }
             ));
-        }).bounds(x, y, LEFT_W, 20).build();
+        });
         addRenderableWidget(btnAddKey);
         y += 24;
 
         // Add Command
-        btnAddCmd = Button.builder(Component.literal("Add Command"), b -> {
+        btnAddCmd = ActionEditorUi.button(x, y, LEFT_W, 20, Component.translatable("ezactions.gui.menu_editor.add_command"), () -> {
             this.minecraft.setScreen(new CommandActionEditScreen(this, null));
-        }).bounds(x, y, LEFT_W, 20).build();
+        });
         addRenderableWidget(btnAddCmd);
         y += 24;
 
+        // Add Item Equip
+        btnAddEquip = ActionEditorUi.button(x, y, LEFT_W, 20, Component.translatable("ezactions.gui.menu_editor.add_item_equip"), () -> {
+            this.minecraft.setScreen(new ItemEquipActionEditScreen(this, null));
+        });
+        addRenderableWidget(btnAddEquip);
+        y += 24;
+
         // Add Category
-        btnAddCat = Button.builder(Component.literal("Add Bundle"), b -> {
+        btnAddCat = ActionEditorUi.button(x, y, LEFT_W, 20, Component.translatable("ezactions.gui.menu_editor.add_bundle"), () -> {
             this.minecraft.setScreen(new CategoryEditScreen(this, null));
-        }).bounds(x, y, LEFT_W, 20).build();
+        });
         addRenderableWidget(btnAddCat);
         y += 24;
 
         // Edit / Remove
-        btnEdit = Button.builder(Component.literal("Edit Selected"), b -> onEditSelected())
-                .bounds(x, y, LEFT_W, 20).build();
+        btnEdit = ActionEditorUi.button(x, y, LEFT_W, 20, Component.translatable("ezactions.gui.menu_editor.edit_selected"), this::onEditSelected);
         addRenderableWidget(btnEdit);
         y += 24;
 
-        btnRemove = Button.builder(Component.literal("Remove Selected"), b -> onRemoveSelected())
-                .bounds(x, y, LEFT_W, 20).build();
+        btnRemove = ActionEditorUi.button(x, y, LEFT_W, 20, Component.translatable("ezactions.gui.menu_editor.remove_selected"), this::onRemoveSelected);
         addRenderableWidget(btnRemove);
         y += 24;
 
@@ -349,32 +405,31 @@ public final class MenuEditorScreen extends Screen {
         final int HALF_W = (LEFT_W - H_GAP) / 2;
 
         // Labels with simple Unicode arrows; tinted so they stand out
-        Component importLabel = Component.literal("⇩ Import").withStyle(ChatFormatting.AQUA);
-        Component exportLabel = Component.literal("⇧ Export").withStyle(ChatFormatting.AQUA);
+        Component importLabel = Component.translatable("ezactions.gui.menu_editor.import").withStyle(ChatFormatting.AQUA);
+        Component exportLabel = Component.translatable("ezactions.gui.menu_editor.export").withStyle(ChatFormatting.AQUA);
 
         // Bottom row (nearest to bottom): Close | Config
         int yRowBottom = bottom - 22;
         int xLeftCol   = x;
         int xRightCol  = x + HALF_W + H_GAP;
 
-        btnClose = Button.builder(Component.literal("Close"), b -> onClose())
-                .bounds(xLeftCol, yRowBottom, HALF_W, BTN_H).build();
+        btnClose = ActionEditorUi.button(xLeftCol, yRowBottom, HALF_W, BTN_H, Component.translatable("ezactions.gui.common.close"), this::onClose);
         addRenderableWidget(btnClose);
 
         // Inside MenuEditorScreen.init() where btnConfig is created
-        btnConfig = Button.builder(Component.literal("Config"), b -> {
+        btnConfig = ActionEditorUi.button(xRightCol, yRowBottom, HALF_W, BTN_H, Component.translatable("ezactions.gui.common.config"), () -> {
             try {
                 this.minecraft.setScreen(new org.z2six.ezactions.gui.editor.config.ConfigScreen(this));
             } catch (Throwable t) {
                 org.z2six.ezactions.Constants.LOG.warn("[{}] Config button handler failed: {}", org.z2six.ezactions.Constants.MOD_NAME, t.toString());
             }
-        }).bounds(xRightCol, yRowBottom, HALF_W, BTN_H).build();
+        });
         addRenderableWidget(btnConfig);
 
         // Row above bottom: Import | Export
         int yRowTop = yRowBottom - VSTEP;
 
-        btnImport = Button.builder(importLabel, b -> {
+        btnImport = ActionEditorUi.button(xLeftCol, yRowTop, HALF_W, BTN_H, importLabel, () -> {
             try {
                 int n = MenuImportExport.importFromClipboard();
                 if (n >= 0) {
@@ -385,16 +440,16 @@ public final class MenuEditorScreen extends Screen {
             } catch (Throwable t) {
                 Constants.LOG.warn("[{}] Import button action failed: {}", Constants.MOD_NAME, t.toString());
             }
-        }).bounds(xLeftCol, yRowTop, HALF_W, BTN_H).build();
+        });
         addRenderableWidget(btnImport);
 
-        btnExport = Button.builder(exportLabel, b -> {
+        btnExport = ActionEditorUi.button(xRightCol, yRowTop, HALF_W, BTN_H, exportLabel, () -> {
             try {
                 MenuImportExport.exportToClipboard();
             } catch (Throwable t) {
                 Constants.LOG.warn("[{}] Export button action failed: {}", Constants.MOD_NAME, t.toString());
             }
-        }).bounds(xRightCol, yRowTop, HALF_W, BTN_H).build();
+        });
         addRenderableWidget(btnExport);
         // ---------------------------------------------------------------------
 
@@ -472,6 +527,8 @@ public final class MenuEditorScreen extends Screen {
             ));
         } else if (t == ClickActionType.COMMAND) {
             this.minecraft.setScreen(new CommandActionEditScreen(this, mi));
+        } else if (t == ClickActionType.ITEM_EQUIP) {
+            this.minecraft.setScreen(new ItemEquipActionEditScreen(this, mi));
         }
     }
 
@@ -481,6 +538,10 @@ public final class MenuEditorScreen extends Screen {
         if (!(r instanceof Rows.ItemRow)) return;
 
         MenuItem mi = ((Rows.ItemRow) r).item();
+        if (mi != null && mi.locked()) {
+            Constants.LOG.info("[{}] Refused to remove locked item '{}'.", Constants.MOD_NAME, mi.id());
+            return;
+        }
         String id = mi.id();
         try {
             boolean ok = RadialMenu.removeFromCurrent(id);
@@ -505,7 +566,7 @@ public final class MenuEditorScreen extends Screen {
 
         // Title
         int panelCenterX = listLeft + (listWidth / 2);
-        g.drawCenteredString(this.font, this.title.getString(), panelCenterX, 6, 0xFFFFFF);
+        g.drawCenteredString(this.font, this.title, panelCenterX, 6, 0xFFFFFF);
 
         int first = firstVisibleRow();
         int last  = lastVisibleRow();
@@ -531,16 +592,16 @@ public final class MenuEditorScreen extends Screen {
             else if (hov) g.fill(listLeft, y, listLeft + listWidth, y + ROW_H, ROW_BG);
 
             if (isBreadcrumb) {
-                String txt = ((Rows.BreadcrumbRow) r).path();
+                String txt = localizeBreadcrumbPath(((Rows.BreadcrumbRow) r).path());
                 g.drawString(this.font, txt, listLeft + 8, y + (ROW_H - this.font.lineHeight) / 2, 0xFFFFFFFF);
 
             } else if (isBackRoot) {
-                String txt = net.minecraft.ChatFormatting.RED + "Back to root";
+                String txt = net.minecraft.ChatFormatting.RED + Component.translatable("ezactions.gui.menu_editor.back_to_root").getString();
                 g.drawString(this.font, txt, listLeft + 8, y + (ROW_H - this.font.lineHeight) / 2, 0xFF0000);
 
             } else if (isBackParent) {
                 String parent = ((Rows.BackToParentRow) r).parentName();
-                String txt = net.minecraft.ChatFormatting.RED + "Back to " + parent;
+                String txt = net.minecraft.ChatFormatting.RED + Component.translatable("ezactions.gui.menu_editor.back_to_parent", parent).getString();
                 g.drawString(this.font, txt, listLeft + 8, y + (ROW_H - this.font.lineHeight) / 2, 0xFF0000);
 
             } else {
@@ -583,21 +644,20 @@ public final class MenuEditorScreen extends Screen {
                     }
                 }
 
-                // Name (with RMB hint for categories) — now as Component to support styles/translations
+                // Name (with RMB hint for categories)
                 net.minecraft.network.chat.Component nameC = mi.titleComponent();
                 if (mi.isCategory()) {
-                    nameC = net.minecraft.network.chat.Component.literal("(RMB to open) ")
+                    nameC = Component.translatable("ezactions.gui.menu_editor.rmb_open_prefix")
                             .withStyle(net.minecraft.ChatFormatting.RED)
                             .append(nameC);
                 }
                 // Draw at computed X
                 g.drawString(this.font, nameC, titleX, y + (ROW_H - this.font.lineHeight) / 2, 0xFFFFFF, false);
 
-                // Right-aligned type label (BUNDLE for categories)
-                org.z2six.ezactions.data.click.IClickAction act = mi.action();
-                String t = (act != null) ? act.getType().name() : "BUNDLE";
-                int tw = this.font.width(t);
-                g.drawString(this.font, t, listLeft + listWidth - tw - 8, y + (ROW_H - this.font.lineHeight) / 2, 0xA0A0A0);
+                // Right-aligned type label
+                Component typeText = typeLabel(mi);
+                int tw = this.font.width(typeText);
+                g.drawString(this.font, typeText, listLeft + listWidth - tw - 8, y + (ROW_H - this.font.lineHeight) / 2, 0xA0A0A0);
             }
         }
 
@@ -620,7 +680,7 @@ public final class MenuEditorScreen extends Screen {
                 }
                 net.minecraft.network.chat.Component nameC = mi.titleComponent();
                 if (mi.isCategory()) {
-                    nameC = net.minecraft.network.chat.Component.literal("(RMB to open) ")
+                    nameC = Component.translatable("ezactions.gui.menu_editor.rmb_open_prefix")
                             .withStyle(net.minecraft.ChatFormatting.RED)
                             .append(nameC);
                 }
@@ -990,6 +1050,68 @@ public final class MenuEditorScreen extends Screen {
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, deltaX, deltaY);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if ((modifiers & GLFW.GLFW_MOD_CONTROL) != 0 && keyCode == GLFW.GLFW_KEY_F) {
+            if (filterBox != null) {
+                setFocused(filterBox);
+                filterBox.setFocused(true);
+                return true;
+            }
+        }
+
+        if (filterBox != null && filterBox.isFocused()) {
+            // Let text editing/navigation inside the filter box work as expected.
+            return super.keyPressed(keyCode, scanCode, modifiers);
+        }
+
+        if (keyCode == GLFW.GLFW_KEY_DELETE || keyCode == GLFW.GLFW_KEY_BACKSPACE) {
+            onRemoveSelected();
+            return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
+            onEditSelected();
+            return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_UP) {
+            if (moveSelectedBy(-1)) return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_DOWN) {
+            if (moveSelectedBy(+1)) return true;
+        }
+
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    private boolean moveSelectedBy(int delta) {
+        if (delta == 0) return false;
+        if (selectedRow < 0 || selectedRow >= rows.size()) return false;
+        if (!(rows.get(selectedRow) instanceof Rows.ItemRow)) return false;
+        if (filterBox != null && !filterBox.getValue().trim().isEmpty()) {
+            // Avoid ambiguous reorders when list is filtered.
+            return false;
+        }
+
+        int fromContent = rowToContentIndex(selectedRow);
+        int toContent = fromContent + delta;
+        int count = contentCount();
+        if (fromContent < 0 || toContent < 0 || toContent >= count) return false;
+
+        try {
+            // moveInCurrent(from,to) interprets 'to' as insertion slot, so down-moves need +1.
+            int insertSlot = (delta > 0) ? (toContent + 1) : toContent;
+            boolean ok = RadialMenu.moveInCurrent(fromContent, insertSlot);
+            if (!ok) return false;
+            rebuildRows();
+            selectedRow = contentIndexToRow(toContent);
+            ensureSelectedVisible();
+            return true;
+        } catch (Throwable t) {
+            Constants.LOG.warn("[{}] Keyboard move failed: {}", Constants.MOD_NAME, t.toString());
+            return false;
+        }
     }
 
     private boolean hitList(double mx, double my) {

@@ -2,9 +2,12 @@
 package org.z2six.ezactions.data.menu;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
 import org.z2six.ezactions.Constants;
 import org.z2six.ezactions.data.json.MenuLoader;
 import org.z2six.ezactions.gui.RadialMenuScreen;
+import org.z2six.ezactions.util.BundleHotkeyManager;
 
 import java.util.*;
 
@@ -24,8 +27,62 @@ public final class RadialMenu {
     private static List<MenuItem> ROOT = new ArrayList<>();
     // PATH is maintained root -> ... -> deepest (append when entering, remove last when going back)
     private static final Deque<MenuItem> PATH = new ArrayDeque<>();
+    private static List<MenuItem> TEMP_ROOT = null;
+    private static final Deque<MenuItem> TEMP_PATH = new ArrayDeque<>();
+    private static TemporaryStyle TEMP_STYLE = null;
+    private static Screen TEMP_RETURN_SCREEN = null;
+    private static TemporaryStyle PREVIEW_STYLE = null;
 
     private RadialMenu() {}
+
+    /** Optional style overrides for a temporary API radial session. */
+    public static final class TemporaryStyle {
+        public final Integer ringColor;
+        public final Integer hoverColor;
+        public final Integer borderColor;
+        public final Integer textColor;
+        public final Boolean animationsEnabled;
+        public final Boolean animOpenClose;
+        public final Boolean animHover;
+        public final Integer openCloseMs;
+        public final Double hoverGrowPct;
+        public final String openStyle;
+        public final String openDirection;
+        public final String hoverStyle;
+        public final Integer deadzone;
+        public final Integer baseOuterRadius;
+        public final Integer ringThickness;
+        public final Integer scaleStartThreshold;
+        public final Integer scalePerItem;
+        public final Integer sliceGapDeg;
+        public final String designStyle;
+
+        public TemporaryStyle(Integer ringColor, Integer hoverColor, Integer borderColor, Integer textColor,
+                              Boolean animationsEnabled, Boolean animOpenClose, Boolean animHover,
+                              Integer openCloseMs, Double hoverGrowPct, String openStyle, String openDirection, String hoverStyle,
+                              Integer deadzone, Integer baseOuterRadius, Integer ringThickness,
+                              Integer scaleStartThreshold, Integer scalePerItem, Integer sliceGapDeg, String designStyle) {
+            this.ringColor = ringColor;
+            this.hoverColor = hoverColor;
+            this.borderColor = borderColor;
+            this.textColor = textColor;
+            this.animationsEnabled = animationsEnabled;
+            this.animOpenClose = animOpenClose;
+            this.animHover = animHover;
+            this.openCloseMs = openCloseMs;
+            this.hoverGrowPct = hoverGrowPct;
+            this.openStyle = openStyle;
+            this.openDirection = openDirection;
+            this.hoverStyle = hoverStyle;
+            this.deadzone = deadzone;
+            this.baseOuterRadius = baseOuterRadius;
+            this.ringThickness = ringThickness;
+            this.scaleStartThreshold = scaleStartThreshold;
+            this.scalePerItem = scalePerItem;
+            this.sliceGapDeg = sliceGapDeg;
+            this.designStyle = designStyle;
+        }
+    }
 
     /** Open the radial as a Screen, always starting at ROOT. */
     public static void open() {
@@ -48,6 +105,7 @@ public final class RadialMenu {
             }
             // -------------------------------------------------------------------------------
 
+            clearTemporarySession();
             ensureLoaded();
             PATH.clear(); // important: always open at root
             mc.setScreen(new RadialMenuScreen());
@@ -77,6 +135,7 @@ public final class RadialMenu {
                 return;
             }
 
+            clearTemporarySession();
             ensureLoaded();
             PATH.clear();
 
@@ -99,15 +158,73 @@ public final class RadialMenu {
         }
     }
 
+    /** Open a one-off radial session using API-provided items (not persisted). */
+    public static boolean openTemporary(List<MenuItem> rootItems, TemporaryStyle style) {
+        return openTemporary(rootItems, style, null);
+    }
+
+    public static boolean openTemporary(List<MenuItem> rootItems, TemporaryStyle style, Screen returnTo) {
+        try {
+            final Minecraft mc = Minecraft.getInstance();
+            if (mc == null || mc.player == null || mc.level == null) {
+                Constants.LOG.debug("[{}] openTemporary ignored: client/world not ready.", Constants.MOD_NAME);
+                return false;
+            }
+            if (mc.screen != null || mc.isPaused()) {
+                final String scr = (mc.screen == null) ? "none" : mc.screen.getClass().getSimpleName();
+                Constants.LOG.debug("[{}] openTemporary ignored: screen={}, paused={}", Constants.MOD_NAME, scr, mc.isPaused());
+                return false;
+            }
+
+            TEMP_ROOT = (rootItems == null) ? new ArrayList<>() : new ArrayList<>(rootItems);
+            TEMP_PATH.clear();
+            TEMP_STYLE = style;
+            TEMP_RETURN_SCREEN = returnTo;
+            mc.setScreen(new RadialMenuScreen());
+            return true;
+        } catch (Throwable t) {
+            Constants.LOG.warn("[{}] openTemporary failed: {}", Constants.MOD_NAME, t.toString());
+            clearTemporarySession();
+            return false;
+        }
+    }
+
+    /** Called by radial screen close to clean up transient sessions. */
+    public static Screen onRadialClosed() {
+        Screen ret = TEMP_RETURN_SCREEN;
+        clearTemporarySession();
+        return ret;
+    }
+
+    /** True while a temporary API-driven radial session is active. */
+    public static boolean isTemporarySession() {
+        return TEMP_ROOT != null;
+    }
+
+    /** Active temporary style overrides, if any. */
+    public static TemporaryStyle temporaryStyle() {
+        return TEMP_STYLE != null ? TEMP_STYLE : PREVIEW_STYLE;
+    }
+
+    /** Preview-only style override (used by config preview UI). */
+    public static void setPreviewStyle(TemporaryStyle style) {
+        PREVIEW_STYLE = style;
+    }
+
+    /** Clears preview-only style override. */
+    public static void clearPreviewStyle() {
+        PREVIEW_STYLE = null;
+    }
+
     /** Manually reset to root (used by editor or tests). */
     public static void resetToRoot() {
-        PATH.clear();
+        activePath().clear();
     }
 
     public static void enterCategory(MenuItem cat) {
         if (cat == null || !cat.isCategory()) return;
         // append so iteration order is root -> deepest
-        PATH.addLast(cat);
+        activePath().addLast(cat);
     }
 
     /**
@@ -118,11 +235,12 @@ public final class RadialMenu {
      */
     public static List<MenuItem> parentItems() {
         ensureLoaded();
-        if (PATH.isEmpty()) return null; // at root: no parent
+        Deque<MenuItem> path = activePath();
+        if (path.isEmpty()) return null; // at root: no parent
 
         // Walk root -> ... -> current, while remembering the list at the previous depth.
-        List<MenuItem> items = ROOT;
-        Iterator<MenuItem> it = PATH.iterator();
+        List<MenuItem> items = activeRoot();
+        Iterator<MenuItem> it = path.iterator();
         while (it.hasNext()) {
             MenuItem cat = it.next();
             if (!it.hasNext()) {
@@ -135,18 +253,19 @@ public final class RadialMenu {
         return null; // defensive
     }
 
-    public static boolean canGoBack() { return !PATH.isEmpty(); }
+    public static boolean canGoBack() { return !activePath().isEmpty(); }
 
     public static void goBack() {
-        if (!PATH.isEmpty()) PATH.removeLast();
+        Deque<MenuItem> path = activePath();
+        if (!path.isEmpty()) path.removeLast();
     }
 
     /** Returns the current page's mutable list (full model; editor uses this). */
     public static List<MenuItem> currentItems() {
         ensureLoaded();
-        List<MenuItem> items = ROOT;
+        List<MenuItem> items = activeRoot();
         // walk root -> deepest
-        for (MenuItem cat : PATH) {
+        for (MenuItem cat : activePath()) {
             items = cat.childrenMutable();
         }
         return items;
@@ -166,7 +285,7 @@ public final class RadialMenu {
             List<MenuItem> base = currentItems();
             if (base == null) return Collections.emptyList();
 
-            if (PATH.isEmpty()) {
+            if (activePath().isEmpty()) {
                 List<MenuItem> out = new ArrayList<>(base.size());
                 for (MenuItem mi : base) {
                     if (mi == null) continue;
@@ -188,9 +307,9 @@ public final class RadialMenu {
         ensureLoaded();
         List<String> out = new ArrayList<>();
         out.add("root");
-        for (MenuItem cat : PATH) {
+        for (MenuItem cat : activePath()) {
             String t = cat == null ? "" : (cat.title() == null ? "" : cat.title());
-            out.add(t.isEmpty() ? "(unnamed)" : t);
+            out.add(t.isEmpty() ? Component.translatable("ezactions.common.unnamed").getString() : t);
         }
         return out;
     }
@@ -200,10 +319,12 @@ public final class RadialMenu {
         try {
             ROOT = MenuLoader.loadMenu();
             PATH.clear();
+            clearTemporarySession();
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] RadialMenu reload failed: {}", Constants.MOD_NAME, t.toString());
             ROOT = new ArrayList<>();
             PATH.clear();
+            clearTemporarySession();
         }
     }
 
@@ -211,6 +332,21 @@ public final class RadialMenu {
         if (ROOT.isEmpty()) {
             reload();
         }
+    }
+
+    private static List<MenuItem> activeRoot() {
+        return TEMP_ROOT != null ? TEMP_ROOT : ROOT;
+    }
+
+    private static Deque<MenuItem> activePath() {
+        return TEMP_ROOT != null ? TEMP_PATH : PATH;
+    }
+
+    private static void clearTemporarySession() {
+        TEMP_ROOT = null;
+        TEMP_PATH.clear();
+        TEMP_STYLE = null;
+        TEMP_RETURN_SCREEN = null;
     }
 
     /** Direct mutable access to root (editor use). */
@@ -229,7 +365,7 @@ public final class RadialMenu {
 
     public static boolean removeFromCurrent(String id) {
         List<MenuItem> cur = currentItems();
-        boolean removed = cur.removeIf(mi -> Objects.equals(mi.id(), id));
+        boolean removed = cur.removeIf(mi -> mi != null && Objects.equals(mi.id(), id) && !mi.locked());
         if (removed) persist();
         return removed;
     }
@@ -265,6 +401,7 @@ public final class RadialMenu {
     public static void persist() {
         try {
             MenuLoader.saveMenu(ROOT);
+            BundleHotkeyManager.notifyRestartRequiredIfNeeded("persist");
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] Failed to persist menu: {}", Constants.MOD_NAME, t.toString());
         }
@@ -277,8 +414,7 @@ public final class RadialMenu {
         try {
             List<MenuItem> items = currentItems();
             if (items == null || id == null) return false;
-
-            boolean removed = items.removeIf(mi -> Objects.equals(mi.id(), id));
+            boolean removed = items.removeIf(mi -> mi != null && Objects.equals(mi.id(), id) && !mi.locked());
             if (removed) {
                 persist(); // write-through to disk
             }

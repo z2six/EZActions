@@ -3,6 +3,7 @@ package org.z2six.ezactions.gui;
 
 import org.z2six.ezactions.Constants;
 import org.z2six.ezactions.config.RadialConfig;
+import org.z2six.ezactions.data.menu.RadialMenu;
 
 /** Math helpers for the radial menu. */
 public final class RadialScreenMath {
@@ -13,11 +14,18 @@ public final class RadialScreenMath {
     public static Radii computeRadii(int items) {
         try {
             RadialConfig c = RadialConfig.get();
+            RadialMenu.TemporaryStyle temp = RadialMenu.temporaryStyle();
             int n = Math.max(0, items);
-            int extra = Math.max(0, n - Math.max(0, c.scaleStartThreshold));
-            double rOuter = c.baseOuterRadius + extra * Math.max(0, c.scalePerItem);
-            double rInner = Math.max(8, rOuter - Math.max(8, c.ringThickness));
-            return new Radii(rInner, rOuter, c.deadzone);
+            int threshold = temp != null && temp.scaleStartThreshold != null ? temp.scaleStartThreshold : c.scaleStartThreshold;
+            int scalePerItem = temp != null && temp.scalePerItem != null ? temp.scalePerItem : c.scalePerItem;
+            int baseOuter = temp != null && temp.baseOuterRadius != null ? temp.baseOuterRadius : c.baseOuterRadius;
+            int thickness = temp != null && temp.ringThickness != null ? temp.ringThickness : c.ringThickness;
+            int deadzone = temp != null && temp.deadzone != null ? temp.deadzone : c.deadzone;
+
+            int extra = Math.max(0, n - Math.max(0, threshold));
+            double rOuter = baseOuter + extra * Math.max(0, scalePerItem);
+            double rInner = Math.max(8, rOuter - Math.max(8, thickness));
+            return new Radii(rInner, rOuter, deadzone);
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] computeRadii error: {}", Constants.MOD_NAME, t.toString());
             // Safe fallback

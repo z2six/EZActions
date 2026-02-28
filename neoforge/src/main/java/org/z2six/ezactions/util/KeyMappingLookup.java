@@ -5,7 +5,6 @@ import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
-import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
@@ -44,7 +43,7 @@ public final class KeyMappingLookup {
     public static Component localizedName(KeyMapping mapping) {
         try {
             String key = mapping.getName();
-            return Component.literal(I18n.get(key));
+            return Component.translatable(key);
         } catch (Throwable t) {
             return Component.literal(mapping.getName());
         }

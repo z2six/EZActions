@@ -20,7 +20,8 @@ public interface IClickAction {
 
     /** Human-friendly title for menus (localizable); avoid heavy work here. */
     default Component getDisplayName() {
-        return Component.literal(getType().name());
+        String type = (getType() == null) ? "action" : getType().name().toLowerCase(java.util.Locale.ROOT);
+        return Component.translatable("ezactions.action.type." + type);
     }
 
     /**

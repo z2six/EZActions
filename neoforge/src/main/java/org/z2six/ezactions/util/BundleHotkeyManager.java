@@ -3,6 +3,8 @@ package org.z2six.ezactions.util;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import org.z2six.ezactions.Constants;
 import org.z2six.ezactions.data.menu.MenuItem;
@@ -24,6 +26,8 @@ import java.util.*;
 public final class BundleHotkeyManager {
 
     private static final Map<String, KeyMapping> BUNDLE_KEYS_BY_ID = new HashMap<>();
+    private static final Set<String> RESTART_WARNED_IDS = new HashSet<>();
+    private static long lastWarnAtMs = 0L;
 
     private BundleHotkeyManager() {}
 
@@ -75,6 +79,69 @@ public final class BundleHotkeyManager {
     /** Exposed for KeyboardHandler: mapping bundleId -> KeyMapping. */
     public static Map<String, KeyMapping> getBundleKeyMappings() {
         return BUNDLE_KEYS_BY_ID;
+    }
+
+    /**
+     * Show a one-time client message when keybind-enabled bundles exist that are not yet
+     * registered in this session (which means restart is required).
+     */
+    public static void notifyRestartRequiredIfNeeded(String source) {
+        try {
+            Set<String> enabled = enabledBundleIdsNow();
+            Set<String> pending = new HashSet<>(enabled);
+            pending.removeAll(BUNDLE_KEYS_BY_ID.keySet());
+
+            // Keep the warning set in sync when entries are no longer pending.
+            RESTART_WARNED_IDS.retainAll(pending);
+            if (pending.isEmpty()) return;
+
+            Set<String> fresh = new HashSet<>(pending);
+            fresh.removeAll(RESTART_WARNED_IDS);
+            if (fresh.isEmpty()) return;
+
+            long now = System.currentTimeMillis();
+            Minecraft mc = Minecraft.getInstance();
+            if (mc == null || mc.player == null) return;
+            if (now - lastWarnAtMs < 1200L) return;
+
+            lastWarnAtMs = now;
+            RESTART_WARNED_IDS.addAll(fresh);
+
+            String sample = fresh.iterator().next();
+            int extra = fresh.size() - 1;
+            Component msg = (extra > 0)
+                    ? Component.translatable("ezactions.message.restart_required_bundles_more", sample, extra)
+                    : Component.translatable("ezactions.message.restart_required_bundles_one", sample);
+            mc.player.displayClientMessage(msg, false);
+            Constants.LOG.info("[{}] Restart needed for {} bundle keybind change(s). source={}",
+                    Constants.MOD_NAME, fresh.size(), source == null ? "unknown" : source);
+        } catch (Throwable t) {
+            Constants.LOG.debug("[{}] notifyRestartRequiredIfNeeded failed: {}", Constants.MOD_NAME, t.toString());
+        }
+    }
+
+    private static Set<String> enabledBundleIdsNow() {
+        Set<String> out = new HashSet<>();
+        try {
+            List<MenuItem> root = new ArrayList<>(RadialMenu.rootMutable());
+            collectEnabledIds(root, out);
+        } catch (Throwable t) {
+            Constants.LOG.debug("[{}] enabledBundleIdsNow failed: {}", Constants.MOD_NAME, t.toString());
+        }
+        return out;
+    }
+
+    private static void collectEnabledIds(List<MenuItem> src, Set<String> out) {
+        if (src == null || out == null) return;
+        for (MenuItem mi : src) {
+            if (mi == null || !mi.isCategory()) continue;
+            try {
+                if (mi.bundleKeybindEnabled() && mi.id() != null && !mi.id().isBlank()) {
+                    out.add(mi.id());
+                }
+                collectEnabledIds(mi.childrenMutable(), out);
+            } catch (Throwable ignored) {}
+        }
     }
 
     private static void collectBundles(List<MenuItem> src, List<MenuItem> out, Set<String> usedIds) {

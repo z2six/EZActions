@@ -3,6 +3,7 @@ package org.z2six.ezactions.api.internal;
 import org.z2six.ezactions.data.menu.MenuItem;
 import org.z2six.ezactions.gui.editor.menu.MenuNavUtil;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
@@ -38,6 +39,7 @@ final class TreeOps {
             MenuItem mi = it.next();
             if (mi == null) continue;
             if (Objects.equals(mi.id(), id)) {
+                if (mi.locked()) return false;
                 it.remove();
                 return true;
             }
@@ -103,7 +105,15 @@ final class TreeOps {
 
     /** Current UI breadcrumb titles (from your editor/radial util), null-safe. */
     static List<String> currentPathTitles() {
-        try { return MenuNavUtil.capturePathTitles(); }
+        try {
+            List<String> raw = MenuNavUtil.capturePathTitles();
+            if (raw == null || raw.isEmpty()) return List.of();
+            List<String> out = new ArrayList<>(raw);
+            if (!out.isEmpty() && "root".equalsIgnoreCase(out.get(0))) {
+                out.remove(0);
+            }
+            return out;
+        }
         catch (Throwable ignored) { return List.of(); }
     }
 

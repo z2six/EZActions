@@ -6,6 +6,7 @@ import com.google.gson.JsonParseException;
 import net.minecraft.util.GsonHelper;
 import org.z2six.ezactions.Constants;
 import org.z2six.ezactions.data.click.ClickActionCommand;
+import org.z2six.ezactions.data.click.ClickActionItemEquip;
 import org.z2six.ezactions.data.click.ClickActionKey;
 import org.z2six.ezactions.data.click.ClickActionType;
 import org.z2six.ezactions.data.click.IClickAction;
@@ -43,6 +44,7 @@ public final class ClickActionSerializer {
         return switch (type) {
             case KEY -> ClickActionKey.deserialize(obj);
             case COMMAND -> ClickActionCommand.deserialize(obj);
+            case ITEM_EQUIP -> ClickActionItemEquip.deserialize(obj);
         };
     }
 }

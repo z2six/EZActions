@@ -29,12 +29,12 @@ import java.util.Objects;
  * - Modifier support:
  *     * Detect required KeyModifier via reflection (NeoForge or Forge). If present, prefer a "modifier shim":
  *          - Temporarily set KeyModifier=NONE (+ fix scancode if needed), inject plain key, restore orig modifier+key.
- *     * If API isn’t available, synthesize modifiers:
- *          - Physically press CTRL/SHIFT/ALT that aren’t already down, send main key with mods mask, then release only
+ *     * If API isnâ€™t available, synthesize modifiers:
+ *          - Physically press CTRL/SHIFT/ALT that arenâ€™t already down, send main key with mods mask, then release only
  *            the modifiers we pressed.
  * - AUTO behavior:
- *     * If UNBOUND or NO-SCAN → try shim (with modifiers, if needed).
- *     * If modifiers required and caller asked for TICK → elevate to INPUT (TICK cannot emulate chords).
+ *     * If UNBOUND or NO-SCAN â†’ try shim (with modifiers, if needed).
+ *     * If modifiers required and caller asked for TICK â†’ elevate to INPUT (TICK cannot emulate chords).
  * - Defensive and verbose; avoids crashes and restores state on failure.
  */
 public final class InputInjector {
@@ -82,7 +82,7 @@ public final class InputInjector {
             }
 
             if (isTextInputFocused(mc)) {
-                Constants.LOG.info("[{}] Input injection blocked: text field (Chat) focused.", Constants.MOD_NAME);
+                Constants.LOG.debug("[{}] Input injection blocked: text field (Chat) focused.", Constants.MOD_NAME);
                 return false;
             }
 
@@ -109,7 +109,7 @@ public final class InputInjector {
                     : mode;
 
             // Log diagnostic
-            Constants.LOG.info(
+            Constants.LOG.debug(
                     "[{}] Key action fired: mapping='{}' mode={} (nominalEff={}) toggle={} " +
                             "[reason: {}] [type={}, glfwKey={}, scan={}, derivedScan={}, mods={} reqMods={}]",
                     Constants.MOD_NAME, safeName(mapping), mode, nominalEff, toggle,
@@ -120,7 +120,7 @@ public final class InputInjector {
             // If modifiers are required, TICK cannot emulate a chord -> elevate to INPUT
             DeliveryMode eff = nominalEff;
             if (req.any() && eff == DeliveryMode.TICK) {
-                Constants.LOG.info("[{}] Elevating TICK->INPUT because '{}' requires modifiers: {}",
+                Constants.LOG.debug("[{}] Elevating TICK->INPUT because '{}' requires modifiers: {}",
                         Constants.MOD_NAME, safeName(mapping), req.brief());
                 eff = DeliveryMode.INPUT;
             }
@@ -358,7 +358,7 @@ public final class InputInjector {
             try {
                 mapping.setKey(newKey);
                 KeyMapping.resetMapping();
-                Constants.LOG.info("[{}] Shim: temporarily bound '{}' to tempKey={} (scan={})",
+                Constants.LOG.debug("[{}] Shim: temporarily bound '{}' to tempKey={} (scan={})",
                         Constants.MOD_NAME, safeName(mapping), temp.glfwKey, temp.scancode);
             } catch (Throwable t) {
                 Constants.LOG.warn("[{}] Shim: failed to set temporary key: {}", Constants.MOD_NAME, t.toString());
@@ -372,7 +372,7 @@ public final class InputInjector {
                 try {
                     mapping.setKey(oldKey == null ? InputConstants.UNKNOWN : oldKey);
                     KeyMapping.resetMapping();
-                    Constants.LOG.info("[{}] Shim: restored '{}' to {}.",
+                    Constants.LOG.debug("[{}] Shim: restored '{}' to {}.",
                             Constants.MOD_NAME, safeName(mapping),
                             (oldKey == null || oldKey.getValue() < 0) ? "UNBOUND" : ("key=" + oldKey.getValue()));
                 } catch (Throwable t) {
@@ -388,7 +388,7 @@ public final class InputInjector {
         }
     }
 
-    /** Pick a temp key that (a) isn’t bound and (b) has a valid scancode. */
+    /** Pick a temp key that (a) isnâ€™t bound and (b) has a valid scancode. */
     @Nullable
     private static TempKey findTemporaryKey(Options opts) {
         List<Integer> candidates = new ArrayList<>(32);
@@ -490,7 +490,7 @@ public final class InputInjector {
 
     /** setKeyModifierAndCode(KeyModifier, InputConstants.Key) via reflection (NeoForge/Forge). */
     private static boolean setKeyModifierAndCode(KeyMapping mapping, @Nullable Enum<?> keyMod, InputConstants.Key key) {
-        // Try NeoForge signature first, then Forge — both typically share the same method name/signature.
+        // Try NeoForge signature first, then Forge â€” both typically share the same method name/signature.
         for (boolean neoFirst : new boolean[]{true, false}) {
             try {
                 Class<? extends Enum<?>> kmEnum = keyModEnum(neoFirst);
@@ -552,7 +552,7 @@ public final class InputInjector {
             boolean setOk = setKeyModifierAndCode(mapping, NONE, newKey);
             if (!setOk) return false;
             KeyMapping.resetMapping();
-            Constants.LOG.info("[{}] ModShim: '{}' -> modifier=NONE key={} (scan={}){}",
+            Constants.LOG.debug("[{}] ModShim: '{}' -> modifier=NONE key={} (scan={}){}",
                     Constants.MOD_NAME, safeName(mapping), useKeyCode, useScan, usingTempKey ? " [temp]" : "");
 
             // Inject plain input (no synthesized modifier needed)
@@ -567,7 +567,7 @@ public final class InputInjector {
                 try {
                     if (setKeyModifierAndCode(mapping, restoreMod, restoreKeyFinal)) {
                         KeyMapping.resetMapping();
-                        Constants.LOG.info("[{}] ModShim: restored '{}' to modifier={} key={}.",
+                        Constants.LOG.debug("[{}] ModShim: restored '{}' to modifier={} key={}.",
                                 Constants.MOD_NAME, safeName(mapping),
                                 restoreModLabel,
                                 (oldKey == null ? "UNBOUND" : oldKey.getValue()));
@@ -575,7 +575,7 @@ public final class InputInjector {
                         // Fallback: restore key only
                         mapping.setKey(restoreKeyFinal);
                         KeyMapping.resetMapping();
-                        Constants.LOG.info("[{}] ModShim: restored '{}' key only (modifier restore failed).",
+                        Constants.LOG.debug("[{}] ModShim: restored '{}' key only (modifier restore failed).",
                                 Constants.MOD_NAME, safeName(mapping));
                     }
                 } catch (Throwable t) {
@@ -637,7 +637,7 @@ public final class InputInjector {
             if (toggle) {
                 boolean newState = !mapping.isDown();
                 mapping.setDown(newState);
-                Constants.LOG.info("[{}] TICK toggle '{}' -> {}", Constants.MOD_NAME, safeName(mapping), newState);
+                Constants.LOG.debug("[{}] TICK toggle '{}' -> {}", Constants.MOD_NAME, safeName(mapping), newState);
                 return true;
             } else {
                 mapping.setDown(true);
@@ -647,7 +647,7 @@ public final class InputInjector {
                         Constants.LOG.warn("[{}] TICK release failed: {}", Constants.MOD_NAME, t.toString());
                     }
                 });
-                Constants.LOG.info("[{}] TICK tap '{}'", Constants.MOD_NAME, safeName(mapping));
+                Constants.LOG.debug("[{}] TICK tap '{}'", Constants.MOD_NAME, safeName(mapping));
                 return true;
             }
         } catch (Throwable t) {
@@ -766,7 +766,7 @@ public final class InputInjector {
             InputConstants.Key k = res.mapping.getKey();
             String type = (k == null) ? "UNKNOWN" : k.getType().name();
             int val = (k == null) ? -1 : k.getValue();
-            Constants.LOG.info(
+            Constants.LOG.debug(
                     "[{}] Resolved mapping: name='{}' match={} localized='{}' keyType={} keyVal={}",
                     Constants.MOD_NAME, res.mapping.getName(), res.matchKind,
                     Component.translatable(res.mapping.getName()).getString(),

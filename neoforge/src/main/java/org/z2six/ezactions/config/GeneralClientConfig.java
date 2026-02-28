@@ -20,6 +20,7 @@ public final class GeneralClientConfig {
     public static final GeneralClientConfig CONFIG;
 
     public final ModConfigSpec.BooleanValue moveWhileRadialOpen;
+    public final ModConfigSpec.BooleanValue showRadialHoverLabel;
 
     /** Visible line count for the command editor's MultiLineEditBox. */
     public final ModConfigSpec.IntValue commandEditorVisibleLines;
@@ -39,6 +40,11 @@ public final class GeneralClientConfig {
                 .translation("ezactions.config.moveWhileRadialOpen")
                 .define("moveWhileRadialOpen", true);
 
+        showRadialHoverLabel = b
+                .comment("Show the center text label for the currently hovered radial item.")
+                .translation("ezactions.config.showRadialHoverLabel")
+                .define("showRadialHoverLabel", true);
+
         commandEditorVisibleLines = b
                 .comment(
                         "How many lines are visible in the multi-line Command editor box.",
@@ -57,6 +63,16 @@ public final class GeneralClientConfig {
             return moveWhileRadialOpen.get();
         } catch (Throwable t) {
             Constants.LOG.debug("[{}] GeneralClientConfig read failed (moveWhileRadialOpen): {}", Constants.MOD_NAME, t.toString());
+            return true;
+        }
+    }
+
+    /** Defensive getter; never throws. */
+    public boolean showRadialHoverLabel() {
+        try {
+            return showRadialHoverLabel.get();
+        } catch (Throwable t) {
+            Constants.LOG.debug("[{}] GeneralClientConfig read failed (showRadialHoverLabel): {}", Constants.MOD_NAME, t.toString());
             return true;
         }
     }

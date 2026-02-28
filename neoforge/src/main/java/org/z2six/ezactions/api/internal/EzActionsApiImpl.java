@@ -1,13 +1,19 @@
 package org.z2six.ezactions.api.internal;
 
 import org.z2six.ezactions.api.EzActionsApi;
+import org.z2six.ezactions.api.DynamicRadialStyle;
+import org.z2six.ezactions.api.EditorOps;
 import org.z2six.ezactions.api.ImportExport;
+import org.z2six.ezactions.api.InputOps;
 import org.z2six.ezactions.api.MenuRead;
 import org.z2six.ezactions.api.MenuWrite;
+import org.z2six.ezactions.api.MenuPath;
+import org.z2six.ezactions.api.events.ApiEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import org.z2six.ezactions.Constants;
 import org.z2six.ezactions.data.click.IClickAction;
+import org.z2six.ezactions.data.icon.IconSpec;
 import org.z2six.ezactions.data.menu.MenuItem;
 import org.z2six.ezactions.data.menu.RadialMenu;
 import org.z2six.ezactions.gui.editor.MenuEditorScreen;
@@ -19,9 +25,12 @@ import java.util.List;
 
 public final class EzActionsApiImpl implements EzActionsApi {
 
+    private final ApiEvents events = new ApiEvents();
     private final MenuRead read = new MenuReadImpl();
-    private final MenuWrite write = new MenuWriteImpl();
-    private final ImportExport io = new ImportExportImpl();
+    private final MenuWrite write = new MenuWriteImpl(events);
+    private final ImportExport io = new ImportExportImpl(events);
+    private final InputOps input = new InputOpsImpl();
+    private final EditorOps editor = new EditorOpsImpl();
 
     @Override
     public void openEditor(Screen parent) {
@@ -35,7 +44,43 @@ public final class EzActionsApiImpl implements EzActionsApi {
     }
 
     @Override
-    public String addAction(String parentIdOrNull, String title, String noteOrNull, IClickAction action) {
+    public void openConfig(Screen parent) {
+        try {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc == null) return;
+            mc.setScreen(new org.z2six.ezactions.gui.editor.config.ConfigScreen(parent));
+        } catch (Throwable t) {
+            Constants.LOG.warn("[{}] openConfig failed: {}", Constants.MOD_NAME, t.toString());
+        }
+    }
+
+    @Override
+    public void openRadial() {
+        try { RadialMenu.open(); }
+        catch (Throwable t) {
+            Constants.LOG.warn("[{}] openRadial failed: {}", Constants.MOD_NAME, t.toString());
+        }
+    }
+
+    @Override
+    public void openRadialAtBundle(String bundleId) {
+        try { RadialMenu.openAtBundle(bundleId); }
+        catch (Throwable t) {
+            Constants.LOG.warn("[{}] openRadialAtBundle failed: {}", Constants.MOD_NAME, t.toString());
+        }
+    }
+
+    @Override
+    public boolean openTemporaryRadial(String jsonItemOrArray, DynamicRadialStyle styleOrNull) {
+        try { return editor.openTemporaryRadial(jsonItemOrArray, styleOrNull); }
+        catch (Throwable t) {
+            Constants.LOG.warn("[{}] openTemporaryRadial failed: {}", Constants.MOD_NAME, t.toString());
+            return false;
+        }
+    }
+
+    @Override
+    public String addAction(String parentIdOrNull, String title, String noteOrNull, IClickAction action, IconSpec iconOrNull, boolean locked) {
         if (action == null) return null;
         List<String> path = MenuNavUtil.capturePathTitles();
         try {
@@ -50,12 +95,18 @@ public final class EzActionsApiImpl implements EzActionsApi {
                     id,
                     safe(title),
                     safe(noteOrNull),
-                    null, // IconSpec
+                    iconOrNull,
                     action,
-                    null  // children null for action
+                    null,  // children null for action
+                    false,
+                    false,
+                    locked
             );
             dst.add(item);
             RadialMenu.persist();
+            fireChanged(path, "addAction");
+            Constants.LOG.info("[{}] API addAction: id='{}' parent='{}' locked={}",
+                    Constants.MOD_NAME, id, parentIdOrNull == null ? "<root>" : parentIdOrNull, locked);
             return id;
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] addAction failed: {}", Constants.MOD_NAME, t.toString());
@@ -66,7 +117,8 @@ public final class EzActionsApiImpl implements EzActionsApi {
     }
 
     @Override
-    public String addBundle(String parentIdOrNull, String title, String noteOrNull) {
+    public String addBundle(String parentIdOrNull, String title, String noteOrNull, IconSpec iconOrNull,
+                            boolean hideFromMainRadial, boolean bundleKeybindEnabled, boolean locked) {
         List<String> path = MenuNavUtil.capturePathTitles();
         try {
             List<MenuItem> dst = (parentIdOrNull == null)
@@ -80,12 +132,18 @@ public final class EzActionsApiImpl implements EzActionsApi {
                     id,
                     safe(title),
                     safe(noteOrNull),
-                    null,            // IconSpec
+                    iconOrNull,
                     null,            // action null for category
-                    new ArrayList<>()// children list for category
+                    new ArrayList<>(),// children list for category
+                    hideFromMainRadial,
+                    bundleKeybindEnabled,
+                    locked
             );
             dst.add(cat);
             RadialMenu.persist();
+            fireChanged(path, "addBundle");
+            Constants.LOG.info("[{}] API addBundle: id='{}' parent='{}' hideFromMainRadial={} keybindEnabled={} locked={}",
+                    Constants.MOD_NAME, id, parentIdOrNull == null ? "<root>" : parentIdOrNull, hideFromMainRadial, bundleKeybindEnabled, locked);
             return id;
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] addBundle failed: {}", Constants.MOD_NAME, t.toString());
@@ -104,6 +162,7 @@ public final class EzActionsApiImpl implements EzActionsApi {
             if (root == null) return false;
             boolean ok = TreeOps.removeByIdRecursive(root, id);
             if (ok) RadialMenu.persist();
+            if (ok) fireChanged(path, "removeItem");
             return ok;
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] removeItem failed: {}", Constants.MOD_NAME, t.toString());
@@ -134,6 +193,7 @@ public final class EzActionsApiImpl implements EzActionsApi {
             if (toIndex > fromIndex) toIndex--;
             list.add(toIndex, moved);
             RadialMenu.persist();
+            fireChanged(path, "moveWithin");
             return true;
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] moveWithin failed: {}", Constants.MOD_NAME, t.toString());
@@ -150,7 +210,14 @@ public final class EzActionsApiImpl implements EzActionsApi {
 
     @Override
     public int importFromClipboard() {
-        try { return MenuImportExport.importFromClipboard(); }
+        try {
+            int count = MenuImportExport.importFromClipboard();
+            if (count >= 0) {
+                try { events._fireImported(MenuPath.root(), "<clipboard>", count); } catch (Throwable ignored) {}
+                fireChanged(List.of(), "importFromClipboard");
+            }
+            return count;
+        }
         catch (Throwable t) {
             Constants.LOG.warn("[{}] importFromClipboard failed: {}", Constants.MOD_NAME, t.toString());
             return -1;
@@ -171,6 +238,9 @@ public final class EzActionsApiImpl implements EzActionsApi {
     @Override public MenuRead menuRead() { return read; }
     @Override public MenuWrite menuWrite() { return write; }
     @Override public ImportExport importExport() { return io; }
+    @Override public InputOps inputOps() { return input; }
+    @Override public EditorOps editorOps() { return editor; }
+    @Override public ApiEvents events() { return events; }
 
     // ---- small local helpers ----
 
@@ -179,5 +249,12 @@ public final class EzActionsApiImpl implements EzActionsApi {
     private static String freshId(String prefix) {
         long t = System.currentTimeMillis();
         return prefix + "_" + Long.toHexString(t) + "_" + Integer.toHexString((int)(Math.random()*0xFFFF));
+    }
+
+    private void fireChanged(List<String> pathTitles, String why) {
+        try {
+            MenuPath p = MenuPath.of(pathTitles == null ? List.of() : pathTitles);
+            events._fireChanged(p, why);
+        } catch (Throwable ignored) {}
     }
 }
