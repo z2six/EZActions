@@ -1,5 +1,6 @@
 site_name: EZ Actions Wiki
 site_description: Complete player and API documentation for EZ Actions
+site_url: https://z2six.github.io/EZActions/
 theme:
   name: material
   language: en
@@ -46,7 +47,7 @@ plugins:
   - i18n:
       docs_structure: suffix
       fallback_to_default: true
-      reconfigure_material: true
+      reconfigure_material: false
       reconfigure_search: true
       languages:
         - locale: en
@@ -120,3 +121,33 @@ markdown_extensions:
 
 extra_css:
   - assets/stylesheets/extra.css
+
+extra:
+  alternate:
+    - name: English
+      link: /EZActions/
+      lang: en
+    - name: 简体中文
+      link: /EZActions/zh/
+      lang: zh
+    - name: Русский
+      link: /EZActions/ru/
+      lang: ru
+    - name: Español
+      link: /EZActions/es/
+      lang: es
+    - name: Português (Brasil)
+      link: /EZActions/pt-BR/
+      lang: pt-BR
+    - name: Deutsch
+      link: /EZActions/de/
+      lang: de
+    - name: Français
+      link: /EZActions/fr/
+      lang: fr
+    - name: 日本語
+      link: /EZActions/ja/
+      lang: ja
+    - name: 한국어
+      link: /EZActions/ko/
+      lang: ko
