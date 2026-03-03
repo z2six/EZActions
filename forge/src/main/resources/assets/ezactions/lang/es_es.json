@@ -1,4 +1,4 @@
-{
+﻿{
   "key.categories.ezactions": "EZ Actions",
   "key.ezactions.open": "Abrir menu radial",
   "key.ezactions.open_editor": "Abrir editor",
@@ -40,15 +40,16 @@
   "ezactions.gui.hint.note_optional": "Nota opcional",
 
   "ezactions.gui.menu_editor.title": "EZ Actions - Editor de menu",
-  "ezactions.gui.menu_editor.hint.filter": "Filtrar por titulo, nota o tipo de accion...",
+  "ezactions.gui.menu_editor.hint.filter": "Filtro...",
+  "ezactions.gui.menu_editor.tooltip.filter": "Filtrar por titulo, nota o tipo de accion...",
   "ezactions.gui.menu_editor.add_key_action": "Agregar accion de tecla",
   "ezactions.gui.menu_editor.add_command": "Agregar comando",
   "ezactions.gui.menu_editor.add_item_equip": "Agregar equipar objetos",
   "ezactions.gui.menu_editor.add_bundle": "Agregar paquete",
   "ezactions.gui.menu_editor.edit_selected": "Editar seleccionado",
   "ezactions.gui.menu_editor.remove_selected": "Eliminar seleccionado",
-  "ezactions.gui.menu_editor.import": "⇩ Importar",
-  "ezactions.gui.menu_editor.export": "⇧ Exportar",
+  "ezactions.gui.menu_editor.import": "â‡© Importar",
+  "ezactions.gui.menu_editor.export": "â‡§ Exportar",
   "ezactions.gui.menu_editor.back_to_root": "Volver a raiz",
   "ezactions.gui.menu_editor.back_to_parent": "Volver a %s",
   "ezactions.gui.menu_editor.rmb_open_prefix": "(RMB para abrir) ",

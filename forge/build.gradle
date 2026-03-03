@@ -13,6 +13,26 @@ mixin {
     config("${mod_id}.forge.mixins.json")
 }
 
+def rawRuntimeMods = fileTree(dir: 'run/mods', include: ['*.jar'])
+def remappedRuntimeModsDir = layout.buildDirectory.dir('remappedRunMods')
+
+def remapRuntimeModTasks = rawRuntimeMods.files.collect { modJar ->
+    def safeName = modJar.name.replaceAll(/[^A-Za-z0-9]/, '_')
+    tasks.register("remapRunMod_${safeName}", net.neoforged.moddevgradle.legacyforge.tasks.RemapJar) {
+        archiveFileName.set(modJar.name)
+        destinationDirectory.set(remappedRuntimeModsDir)
+        input.set(modJar)
+        libraries.from(configurations.remappingDependencies)
+        obfuscation.configureSrgToNamedOperation(remapOperation)
+    }
+}
+
+def prepareRemappedRuntimeMods = tasks.register('prepareRemappedRuntimeMods', Sync) {
+    dependsOn(remapRuntimeModTasks)
+    from(remappedRuntimeModsDir)
+    into(layout.projectDirectory.dir('run/client/mods'))
+}
+
 legacyForge {
     version = "${minecraft_version}-${forge_version}"
     validateAccessTransformers = true
@@ -30,6 +50,8 @@ legacyForge {
     runs {
         client {
             client()
+            gameDirectory.set(file('run/client'))
+            taskBefore(prepareRemappedRuntimeMods)
         }
         data {
             data()

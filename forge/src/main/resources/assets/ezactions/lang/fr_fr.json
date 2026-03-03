@@ -1,4 +1,4 @@
-{
+﻿{
   "key.categories.ezactions": "EZ Actions",
   "key.ezactions.open": "Ouvrir le menu radial",
   "key.ezactions.open_editor": "Ouvrir l'editeur",
@@ -40,15 +40,16 @@
   "ezactions.gui.hint.note_optional": "Note optionnelle",
 
   "ezactions.gui.menu_editor.title": "EZ Actions - Editeur de menu",
-  "ezactions.gui.menu_editor.hint.filter": "Filtrer par titre, note ou type d'action...",
+  "ezactions.gui.menu_editor.hint.filter": "Filtre...",
+  "ezactions.gui.menu_editor.tooltip.filter": "Filtrer par titre, note ou type d'action...",
   "ezactions.gui.menu_editor.add_key_action": "Ajouter une action de touche",
   "ezactions.gui.menu_editor.add_command": "Ajouter une commande",
   "ezactions.gui.menu_editor.add_item_equip": "Ajouter un equipement",
   "ezactions.gui.menu_editor.add_bundle": "Ajouter un groupe",
   "ezactions.gui.menu_editor.edit_selected": "Modifier la selection",
   "ezactions.gui.menu_editor.remove_selected": "Supprimer la selection",
-  "ezactions.gui.menu_editor.import": "⇩ Importer",
-  "ezactions.gui.menu_editor.export": "⇧ Exporter",
+  "ezactions.gui.menu_editor.import": "â‡© Importer",
+  "ezactions.gui.menu_editor.export": "â‡§ Exporter",
   "ezactions.gui.menu_editor.back_to_root": "Retour a la racine",
   "ezactions.gui.menu_editor.back_to_parent": "Retour a %s",
   "ezactions.gui.menu_editor.rmb_open_prefix": "(Clic droit pour ouvrir) ",
@@ -169,8 +170,8 @@
   "ezactions.message.clipboard_empty": "Le presse-papiers est vide.",
   "ezactions.message.clipboard_not_json": "Le presse-papiers ne contient pas de JSON.",
   "ezactions.message.import_root_not_array": "Echec de l'import : le JSON racine n'est pas un tableau.",
-  "ezactions.message.import_entry_not_object": "Echec de l'import : l'entree n°%s n'est pas un objet.",
-  "ezactions.message.import_entry_invalid": "Echec de l'import : l'entree n°%s est invalide.",
+  "ezactions.message.import_entry_not_object": "Echec de l'import : l'entree nÂ°%s n'est pas un objet.",
+  "ezactions.message.import_entry_invalid": "Echec de l'import : l'entree nÂ°%s est invalide.",
   "ezactions.message.import_failed_saving": "Echec de l'import pendant la sauvegarde.",
   "ezactions.message.import_success": "%s elements importes depuis le presse-papiers.",
   "ezactions.message.import_failed": "Echec de l'import (voir journal)."

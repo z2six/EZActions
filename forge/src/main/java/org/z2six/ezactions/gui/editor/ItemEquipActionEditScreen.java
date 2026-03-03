@@ -129,7 +129,7 @@ public final class ItemEquipActionEditScreen extends Screen {
 
     @Override
     protected void init() {
-        this.panel = ActionEditorUi.panel(this.width, this.height, 980, 680, 8);
+        this.panel = ActionEditorUi.panel(this.width, this.height, 980, 520, 8);
         this.scroll.reset();
 
         bodyX = panel.x() + 14;
@@ -165,7 +165,7 @@ public final class ItemEquipActionEditScreen extends Screen {
         titleBox.setResponder(s -> draftTitle = safe(s));
         scroll.track(addRenderableWidget(titleBox));
 
-        noteBox = new EditBox(this.font, fieldX, topCardY + 56, fieldW, 20, Component.translatable("ezactions.gui.field.note"));
+        noteBox = new EditBox(this.font, fieldX, topCardY + 60, fieldW, 20, Component.translatable("ezactions.gui.field.note"));
         noteBox.setHint(Component.translatable("ezactions.gui.hint.note_optional"));
         noteBox.setValue(draftNote);
         noteBox.setResponder(s -> draftNote = safe(s));
@@ -188,6 +188,8 @@ public final class ItemEquipActionEditScreen extends Screen {
         sourceVisibleRows = Math.max(1, (sourceH + SRC_GAP) / pitch);
 
         int buttonY = sourceCardY + sourceCardH + 12;
+        int contentBodyH = Math.max(1, (buttonY + 28) - bodyY);
+        bodyH = Math.min(bodyH, contentBodyH);
         int totalW = (96 * 3) + (8 * 2);
         int left = panel.x() + (panel.w() - totalW) / 2;
 
@@ -560,4 +562,3 @@ public final class ItemEquipActionEditScreen extends Screen {
         return Component.translatable("ezactions.gui.item_equip.slot." + slot.key());
     }
 }
-

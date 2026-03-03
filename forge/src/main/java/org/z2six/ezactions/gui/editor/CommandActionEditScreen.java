@@ -144,7 +144,21 @@ public final class CommandActionEditScreen extends Screen {
 
     @Override
     protected void init() {
-        this.panel = ActionEditorUi.panel(this.width, this.height, 820, 520, 10);
+        int cfgLines = 5;
+        try {
+            cfgLines = GeneralClientConfig.CONFIG.commandEditorVisibleLines();
+        } catch (Throwable ignored) {}
+        if (cfgLines < 1) {
+            cfgLines = 1;
+        }
+        if (cfgLines > 20) {
+            cfgLines = 20;
+        }
+        int preferredH = (this.font.lineHeight * cfgLines) + 6;
+        int cmdH = Math.max(64, preferredH);
+        int desiredPanelH = Math.min(520, Math.max(320, 252 + cmdH));
+
+        this.panel = ActionEditorUi.panel(this.width, this.height, 820, desiredPanelH, 10);
         this.scroll.reset();
 
         bodyX = panel.x() + 14;
@@ -167,7 +181,7 @@ public final class CommandActionEditScreen extends Screen {
         titleBox.setValue(draftTitle);
         titleBox.setResponder(s -> draftTitle = safe(s));
         scroll.track(addRenderableWidget(titleBox));
-        y += 30;
+        y += 34;
 
         noteBox = new EditBox(this.font, fieldX, y, fieldW, 20, Component.translatable("ezactions.gui.field.note"));
         noteBox.setHint(Component.translatable("ezactions.gui.hint.note_optional"));
@@ -176,24 +190,12 @@ public final class CommandActionEditScreen extends Screen {
         scroll.track(addRenderableWidget(noteBox));
 
         int cmdY = y + 34;
-
-        int cfgLines = 5;
-        try {
-            cfgLines = GeneralClientConfig.CONFIG.commandEditorVisibleLines();
-        } catch (Throwable ignored) {}
-        if (cfgLines < 1) {
-            cfgLines = 1;
-        }
-        if (cfgLines > 20) {
-            cfgLines = 20;
-        }
-        int preferredH = (this.font.lineHeight * cfgLines) + 6;
-        int cmdH = Math.max(64, preferredH);
         int delayY = cmdY + cmdH + 34;
         int cycleY = delayY + 24;
         int buttonY = cycleY + 30;
         cardBaseY = bodyY;
         cardBaseH = (buttonY - bodyY) + 34;
+        bodyH = Math.min(bodyH, cardBaseH + 4);
 
         cmdBox = new MultiLineEditBox(
                 this.font,
@@ -352,4 +354,3 @@ public final class CommandActionEditScreen extends Screen {
         return mouseX >= iconX && mouseX <= iconX + 32 && mouseY >= y && mouseY <= y + 32;
     }
 }
-
