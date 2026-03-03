@@ -40,7 +40,8 @@
   "ezactions.gui.hint.note_optional": "Optionale Notiz",
 
   "ezactions.gui.menu_editor.title": "EZ Actions - Menue-Editor",
-  "ezactions.gui.menu_editor.hint.filter": "Nach Titel, Notiz oder Aktionstyp filtern...",
+  "ezactions.gui.menu_editor.hint.filter": "Filter...",
+  "ezactions.gui.menu_editor.tooltip.filter": "Nach Titel, Notiz oder Aktionstyp filtern...",
   "ezactions.gui.menu_editor.add_key_action": "Tastenaktion hinzufuegen",
   "ezactions.gui.menu_editor.add_command": "Befehl hinzufuegen",
   "ezactions.gui.menu_editor.add_item_equip": "Item-Ausruesten hinzufuegen",

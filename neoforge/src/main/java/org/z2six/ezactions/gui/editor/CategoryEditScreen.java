@@ -71,7 +71,7 @@ public final class CategoryEditScreen extends Screen {
 
     @Override
     protected void init() {
-        this.panel = ActionEditorUi.panel(this.width, this.height, 720, 420, 10);
+        this.panel = ActionEditorUi.panel(this.width, this.height, 720, 236, 10);
         this.scroll.reset();
 
         bodyX = panel.x() + 14;
@@ -93,7 +93,7 @@ public final class CategoryEditScreen extends Screen {
         titleBox.setValue(draftTitle);
         titleBox.setResponder(s -> draftTitle = safe(s));
         scroll.track(addRenderableWidget(titleBox));
-        y += 30;
+        y += 34;
 
         noteBox = new EditBox(this.font, fieldX, y, fieldW, 20, Component.translatable("ezactions.gui.field.note"));
         noteBox.setHint(Component.translatable("ezactions.gui.hint.note_optional"));
@@ -126,6 +126,7 @@ public final class CategoryEditScreen extends Screen {
         int left = panel.x() + (panel.w() - totalW) / 2;
         cardBaseY = bodyY;
         cardBaseH = (buttonY - bodyY) + 34;
+        bodyH = Math.min(bodyH, cardBaseH + 4);
 
         scroll.track(addRenderableWidget(ActionEditorUi.button(left, buttonY, 96, 20, Component.translatable("ezactions.gui.common.save"), this::onSavePressed)));
         scroll.track(addRenderableWidget(ActionEditorUi.button(left + 104, buttonY, 96, 20, Component.translatable("ezactions.gui.common.cancel"), this::onClose)));

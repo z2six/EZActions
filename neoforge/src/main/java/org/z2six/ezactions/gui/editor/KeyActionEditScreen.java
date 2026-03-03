@@ -82,7 +82,7 @@ public final class KeyActionEditScreen extends Screen {
 
     @Override
     protected void init() {
-        this.panel = ActionEditorUi.panel(this.width, this.height, 760, 420, 10);
+        this.panel = ActionEditorUi.panel(this.width, this.height, 760, 272, 10);
         this.scroll.reset();
 
         bodyX = panel.x() + 14;
@@ -105,7 +105,7 @@ public final class KeyActionEditScreen extends Screen {
         titleBox.setValue(draftTitle);
         titleBox.setResponder(s -> draftTitle = safe(s));
         scroll.track(addRenderableWidget(titleBox));
-        y += 30;
+        y += 34;
 
         noteBox = new EditBox(this.font, fieldX, y, fieldW, 20, Component.translatable("ezactions.gui.field.note"));
         noteBox.setMaxLength(MAX_LEN_NOTE);
@@ -113,7 +113,7 @@ public final class KeyActionEditScreen extends Screen {
         noteBox.setValue(draftNote);
         noteBox.setResponder(s -> draftNote = safe(s));
         scroll.track(addRenderableWidget(noteBox));
-        y += 30;
+        y += 34;
 
         mappingBox = new EditBox(this.font, fieldX, y, fieldW, 20, Component.translatable("ezactions.gui.field.mapping_name"));
         mappingBox.setMaxLength(MAX_LEN_MAPPING);
@@ -121,7 +121,7 @@ public final class KeyActionEditScreen extends Screen {
         mappingBox.setValue(draftMapping);
         wireMappingResponder();
         scroll.track(addRenderableWidget(mappingBox));
-        y += 30;
+        y += 34;
 
         scroll.track(addRenderableWidget(ActionEditorUi.button(fieldX, y, fieldW, 20, Component.translatable("ezactions.gui.key_action.pick_keybind"), () -> {
             try {
@@ -172,6 +172,7 @@ public final class KeyActionEditScreen extends Screen {
         int left = panel.x() + (panel.w() - totalW) / 2;
         cardBaseY = bodyY;
         cardBaseH = (buttonY - bodyY) + 34;
+        bodyH = Math.min(bodyH, cardBaseH + 4);
 
         scroll.track(addRenderableWidget(ActionEditorUi.button(left, buttonY, 96, 20, Component.translatable("ezactions.gui.common.save"), this::onSavePressed)));
         scroll.track(addRenderableWidget(ActionEditorUi.button(left + 104, buttonY, 96, 20, Component.translatable("ezactions.gui.common.cancel"), this::onClose)));

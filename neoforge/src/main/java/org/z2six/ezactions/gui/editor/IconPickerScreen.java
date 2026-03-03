@@ -7,6 +7,7 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -18,28 +19,120 @@ import org.z2six.ezactions.gui.noblur.NoMenuBlurScreen;
 import org.z2six.ezactions.util.CustomIconManager;
 import org.z2six.ezactions.util.PinyinSearchUtil;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
-/** Scrollable icon grid (vanilla items + custom 16x16 PNG icons). */
+/**
+ * Scrollable icon grid (vanilla items + custom 16x16 PNG icons).
+ *
+ * Performance design:
+ * - Vanilla icon index is built incrementally across ticks (no first-open freeze).
+ * - Visible icons are hydrated first (name/search), then background hydration continues.
+ * - Filtering runs asynchronously with debounce.
+ */
 public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
 
-    private record PickEntry(IconSpec icon, String id, String searchText, String displayName, boolean custom) {}
+    private static final class PickEntry {
+        final IconSpec icon;
+        final String id;
+        final boolean custom;
+        final Item itemRef; // null for custom entries
+
+        volatile String searchText;
+        volatile String displayName;
+        volatile boolean richReady;
+        volatile boolean pinyinQueued;
+
+        PickEntry(IconSpec icon, String id, String searchText, String displayName,
+                  boolean custom, Item itemRef, boolean richReady) {
+            this.icon = icon;
+            this.id = id;
+            this.searchText = searchText;
+            this.displayName = displayName;
+            this.custom = custom;
+            this.itemRef = itemRef;
+            this.richReady = richReady;
+            this.pinyinQueued = false;
+        }
+    }
+
+    private record FilterResult(int generation, List<PickEntry> matches) {}
 
     private final Screen parent;
     private final Consumer<IconSpec> onPick;
-    private static volatile List<PickEntry> CACHED_VANILLA = null;
+
+    // Session-wide vanilla cache that is built progressively.
+    private static final Object VANILLA_LOCK = new Object();
+    private static List<PickEntry> CACHED_VANILLA = null;
+    private static Iterator<Map.Entry<ResourceKey<Item>, Item>> VANILLA_ITER = null;
+    private static boolean VANILLA_BUILD_COMPLETE = false;
+    private static int VANILLA_TARGET_COUNT = 0;
+
+    // Async workers: filtering and optional pinyin enrichment.
+    private static final ExecutorService FILTER_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "ezactions-icon-filter");
+        t.setDaemon(true);
+        t.setPriority(Math.max(Thread.MIN_PRIORITY, Thread.NORM_PRIORITY - 1));
+        return t;
+    });
+    private static final ExecutorService TOKEN_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "ezactions-icon-pinyin");
+        t.setDaemon(true);
+        t.setPriority(Thread.MIN_PRIORITY);
+        return t;
+    });
+
     private final List<PickEntry> allIcons = new ArrayList<>();
     private final List<PickEntry> filteredIcons = new ArrayList<>();
+    private final List<PickEntry> localVanilla = new ArrayList<>();
+
+    private int vanillaAttachedCount = 0;
+    private int vanillaHydrationCursor = 0;
+    private int vanillaHydratedCount = 0;
+
+    private final ArrayDeque<PickEntry> priorityHydration = new ArrayDeque<>();
+    private final IdentityHashMap<PickEntry, Boolean> priorityHydrationSeen = new IdentityHashMap<>();
+
     private String filter = "";
     private double scrollY = 0;
     private EditBox filterBox;
 
+    private volatile FilterResult pendingFilterResult = null;
+    private volatile boolean asyncFilterRefreshRequested = false;
+    private boolean filterDirty = true;
+    private boolean filterInFlight = false;
+    private int filterGeneration = 0;
+    private int appliedFilterGeneration = 0;
+    private long filterDirtySinceNs = 0L;
+
+    private boolean hydrationChangedSearch = false;
+    private long lastHydrationFilterRefreshNs = 0L;
+
     private static final int PADDING = 12;
     private static final int CELL = 24;
     private static final int GAP = 8;
+
+    private static final int PREFETCH_ROWS = 4;
+
+    private static final int VANILLA_BUILD_MAX_PER_TICK = 320;
+    private static final long VANILLA_BUILD_BUDGET_NS = 1_500_000L; // 1.5 ms/tick
+
+    private static final int HYDRATE_MAX_PER_TICK = 64;
+    private static final long HYDRATE_BUDGET_NS = 2_000_000L; // 2 ms/tick
+
+    private static final int HYDRATE_MAX_PER_FRAME = 18;
+    private static final long HYDRATE_BUDGET_FRAME_NS = 500_000L; // 0.5 ms/frame
+
+    private static final long FILTER_DEBOUNCE_NS = 130_000_000L; // 130 ms
+    private static final long HYDRATION_FILTER_REFRESH_NS = 220_000_000L; // 220 ms
 
     private boolean draggingScrollbar = false;
     private int dragGrabOffsetY = 0;
@@ -60,38 +153,58 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
             filterBox = new EditBox(this.font, PADDING, PADDING,
                     Math.max(120, this.width - PADDING * 2 - 20), 18, Component.translatable("ezactions.gui.field.filter"));
             filterBox.setValue(filter);
-            filterBox.setHint(Component.translatable("ezactions.gui.icon_picker.hint.filter"));
+            filterBox.setSuggestion(Component.translatable("ezactions.gui.icon_picker.hint.filter").getString());
             filterBox.setResponder(s -> {
-                filter = s;
-                updateFiltered();
-                double content = contentHeight();
-                double view = viewHeight();
-                scrollY = clamp(scrollY, 0, Math.max(0, content - view));
+                filter = s == null ? "" : s;
+                requestFilterRefresh(false);
             });
             addRenderableWidget(filterBox);
 
             allIcons.clear();
+            filteredIcons.clear();
+            localVanilla.clear();
+            priorityHydration.clear();
+            priorityHydrationSeen.clear();
+            vanillaAttachedCount = 0;
+            vanillaHydrationCursor = 0;
+            vanillaHydratedCount = 0;
+            scrollY = 0;
+            filterInFlight = false;
+            pendingFilterResult = null;
+            asyncFilterRefreshRequested = false;
+            hydrationChangedSearch = false;
 
-            // Custom icons first.
-            CustomIconManager.reload();
+            // Avoid expensive full folder+texture reload on every open.
+            CustomIconManager.ensureLoaded();
             for (String id : CustomIconManager.listIds()) {
                 String search = (id + " custom icon").toLowerCase(Locale.ROOT);
-                allIcons.add(new PickEntry(IconSpec.custom(id), id, search, id, true));
+                allIcons.add(new PickEntry(IconSpec.custom(id), id, search, id, true, null, true));
             }
 
-            // Vanilla item icons (cached once per session).
-            allIcons.addAll(cachedVanillaEntries());
+            ensureVanillaBuildStarted();
+            // Small warmup chunk so first open has immediate results but doesn't hitch.
+            pumpVanillaBuild(96, 700_000L);
+            attachNewVanillaEntries();
 
-            allIcons.sort((a, b) -> {
-                if (a.custom != b.custom) return a.custom ? -1 : 1;
-                return a.id.compareToIgnoreCase(b.id);
-            });
-
-            updateFiltered();
-            scrollY = clamp(scrollY, 0, Math.max(0, contentHeight() - viewHeight()));
+            requestFilterRefresh(true);
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] IconPicker init failed: {}", Constants.MOD_NAME, t.toString());
         }
+    }
+
+    @Override
+    public void tick() {
+        // Continue lightweight vanilla index build without blocking UI.
+        pumpVanillaBuild(VANILLA_BUILD_MAX_PER_TICK, VANILLA_BUILD_BUDGET_NS);
+        attachNewVanillaEntries();
+
+        applyPendingFilterResult();
+        processAsyncRefreshSignals();
+
+        queueVisibleForPriorityHydration();
+        processHydrationBudget(HYDRATE_MAX_PER_TICK, HYDRATE_BUDGET_NS);
+
+        maybeSubmitFilterJob(false);
     }
 
     @Override
@@ -103,6 +216,7 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
         double view = viewHeight();
         if (content > view) {
             scrollY = clamp(scrollY - deltaY * 32.0, 0, Math.max(0, content - view));
+            queueVisibleForPriorityHydration();
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, deltaX, deltaY);
@@ -119,8 +233,11 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
         }
         int idx = iconIndexAt(mx, my);
         if (idx >= 0 && idx < filteredIcons.size()) {
-            try { onPick.accept(filteredIcons.get(idx).icon); }
-            catch (Throwable t) { Constants.LOG.warn("[{}] Icon onPick failed: {}", Constants.MOD_NAME, t.toString()); }
+            try {
+                onPick.accept(filteredIcons.get(idx).icon);
+            } catch (Throwable t) {
+                Constants.LOG.warn("[{}] Icon onPick failed: {}", Constants.MOD_NAME, t.toString());
+            }
             onClose();
             return true;
         }
@@ -130,7 +247,10 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
     @Override
     public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
         if (draggingScrollbar && button == 0) {
-            try { applyDragToScroll(my); } catch (Throwable ignored) {}
+            try {
+                applyDragToScroll(my);
+            } catch (Throwable ignored) {}
+            queueVisibleForPriorityHydration();
             return true;
         }
         return super.mouseDragged(mx, my, button, dx, dy);
@@ -147,6 +267,11 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        // Small per-frame budget so visible rows hydrate quickly while scrolling.
+        applyPendingFilterResult();
+        queueVisibleForPriorityHydration();
+        processHydrationBudget(HYDRATE_MAX_PER_FRAME, HYDRATE_BUDGET_FRAME_NS);
+
         g.fill(0, 0, width, height, 0xA0000000);
 
         int gridLeft = gridLeft();
@@ -188,6 +313,7 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
 
         if (!inIconArea(mouseX, mouseY)) hovered = null;
 
+        drawProgress(g);
         drawScrollbar(g);
         super.render(g, mouseX, mouseY, partialTick);
 
@@ -206,22 +332,333 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
     }
 
     private static String safeName(Item item) {
-        try { return new ItemStack(item == null ? Items.BARRIER : item).getHoverName().getString(); }
-        catch (Throwable ignored) { return ""; }
+        try {
+            return new ItemStack(item == null ? Items.BARRIER : item).getHoverName().getString();
+        } catch (Throwable ignored) {
+            return "";
+        }
     }
 
-    private void updateFiltered() {
-        filteredIcons.clear();
-        if (filter == null || filter.isBlank()) {
-            filteredIcons.addAll(allIcons);
-            return;
+    private static boolean needsPinyinTokens(String s) {
+        if (s == null || s.isBlank()) return false;
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) > 127) return true;
         }
-        String f = filter.toLowerCase(Locale.ROOT);
-        for (PickEntry entry : allIcons) {
-            if (entry.searchText.contains(f)) {
-                filteredIcons.add(entry);
+        return false;
+    }
+
+    private static void ensureVanillaBuildStarted() {
+        synchronized (VANILLA_LOCK) {
+            if (VANILLA_BUILD_COMPLETE || VANILLA_ITER != null) {
+                return;
+            }
+            VANILLA_TARGET_COUNT = Math.max(0, BuiltInRegistries.ITEM.entrySet().size());
+            if (CACHED_VANILLA == null) {
+                CACHED_VANILLA = new ArrayList<>(Math.max(256, VANILLA_TARGET_COUNT));
+            }
+            VANILLA_ITER = BuiltInRegistries.ITEM.entrySet().iterator();
+        }
+    }
+
+    private static int pumpVanillaBuild(int maxItems, long budgetNs) {
+        ensureVanillaBuildStarted();
+        long start = System.nanoTime();
+        int added = 0;
+
+        synchronized (VANILLA_LOCK) {
+            if (VANILLA_BUILD_COMPLETE || VANILLA_ITER == null) {
+                return 0;
+            }
+
+            while (added < maxItems && (System.nanoTime() - start) < budgetNs && VANILLA_ITER.hasNext()) {
+                Map.Entry<ResourceKey<Item>, Item> e = VANILLA_ITER.next();
+                ResourceLocation rl = e.getKey().location();
+                String id = rl.getNamespace() + ":" + rl.getPath();
+                Item item = e.getValue();
+                String base = (id + " item").toLowerCase(Locale.ROOT);
+                CACHED_VANILLA.add(new PickEntry(IconSpec.item(id), id, base, id, false, item, false));
+                added++;
+            }
+
+            if (!VANILLA_ITER.hasNext()) {
+                VANILLA_ITER = null;
+                VANILLA_BUILD_COMPLETE = true;
             }
         }
+
+        return added;
+    }
+
+    private void attachNewVanillaEntries() {
+        List<PickEntry> slice;
+        synchronized (VANILLA_LOCK) {
+            int total = (CACHED_VANILLA == null) ? 0 : CACHED_VANILLA.size();
+            if (vanillaAttachedCount >= total) {
+                return;
+            }
+            slice = new ArrayList<>(CACHED_VANILLA.subList(vanillaAttachedCount, total));
+            vanillaAttachedCount = total;
+        }
+
+        for (PickEntry e : slice) {
+            allIcons.add(e);
+            localVanilla.add(e);
+            if (e.richReady) {
+                vanillaHydratedCount++;
+            }
+        }
+
+        requestFilterRefresh(false);
+    }
+
+    private void requestFilterRefresh(boolean immediate) {
+        filterDirty = true;
+        filterDirtySinceNs = immediate ? 0L : System.nanoTime();
+        if (immediate) {
+            maybeSubmitFilterJob(true);
+        }
+    }
+
+    private String normalizedFilter() {
+        return filter == null ? "" : filter.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private void maybeSubmitFilterJob(boolean force) {
+        if (filterInFlight || !filterDirty) {
+            return;
+        }
+
+        long now = System.nanoTime();
+        if (!force) {
+            if (filterDirtySinceNs == 0L) {
+                filterDirtySinceNs = now;
+            }
+            if ((now - filterDirtySinceNs) < FILTER_DEBOUNCE_NS) {
+                return;
+            }
+        }
+
+        final int generation = ++filterGeneration;
+        final String query = normalizedFilter();
+        final List<PickEntry> snapshot = List.copyOf(allIcons);
+
+        filterDirty = false;
+        filterInFlight = true;
+
+        FILTER_EXECUTOR.execute(() -> {
+            try {
+                List<PickEntry> out = new ArrayList<>();
+                if (query.isBlank()) {
+                    out.addAll(snapshot);
+                } else {
+                    for (PickEntry entry : snapshot) {
+                        String search = entry.searchText;
+                        if (search != null && search.contains(query)) {
+                            out.add(entry);
+                        }
+                    }
+                }
+                pendingFilterResult = new FilterResult(generation, out);
+            } catch (Throwable t) {
+                Constants.LOG.warn("[{}] IconPicker filter task failed: {}", Constants.MOD_NAME, t.toString());
+                pendingFilterResult = new FilterResult(generation, List.of());
+            }
+        });
+    }
+
+    private void applyPendingFilterResult() {
+        FilterResult result = pendingFilterResult;
+        if (result == null) {
+            return;
+        }
+
+        pendingFilterResult = null;
+        filterInFlight = false;
+
+        if (result.generation < appliedFilterGeneration) {
+            return;
+        }
+        appliedFilterGeneration = result.generation;
+
+        filteredIcons.clear();
+        filteredIcons.addAll(result.matches);
+
+        scrollY = clamp(scrollY, 0, Math.max(0, contentHeight() - viewHeight()));
+    }
+
+    private void processAsyncRefreshSignals() {
+        if (asyncFilterRefreshRequested) {
+            asyncFilterRefreshRequested = false;
+            if (!normalizedFilter().isBlank()) {
+                requestFilterRefresh(false);
+            }
+        }
+
+        if (hydrationChangedSearch && !normalizedFilter().isBlank()) {
+            long now = System.nanoTime();
+            if ((now - lastHydrationFilterRefreshNs) >= HYDRATION_FILTER_REFRESH_NS) {
+                hydrationChangedSearch = false;
+                lastHydrationFilterRefreshNs = now;
+                requestFilterRefresh(false);
+            }
+        }
+    }
+
+    private void enqueuePriorityHydration(PickEntry entry) {
+        if (entry == null || entry.custom || entry.richReady) {
+            return;
+        }
+        if (priorityHydrationSeen.put(entry, Boolean.TRUE) == null) {
+            priorityHydration.addLast(entry);
+        }
+    }
+
+    private PickEntry pollPriorityHydration() {
+        while (!priorityHydration.isEmpty()) {
+            PickEntry e = priorityHydration.pollFirst();
+            priorityHydrationSeen.remove(e);
+            if (e != null && !e.richReady && !e.custom) {
+                return e;
+            }
+        }
+        return null;
+    }
+
+    private PickEntry nextBackgroundHydrationEntry() {
+        int n = localVanilla.size();
+        if (n <= 0) {
+            return null;
+        }
+
+        for (int scanned = 0; scanned < n; scanned++) {
+            if (vanillaHydrationCursor >= n) {
+                vanillaHydrationCursor = 0;
+            }
+            PickEntry e = localVanilla.get(vanillaHydrationCursor++);
+            if (!e.richReady) {
+                return e;
+            }
+        }
+        return null;
+    }
+
+    private void queueVisibleForPriorityHydration() {
+        int total = filteredIcons.size();
+        if (total <= 0) {
+            return;
+        }
+
+        int cols = iconCols();
+        if (cols <= 0) {
+            return;
+        }
+
+        int cellSpan = CELL + GAP;
+        int totalRows = (int) Math.ceil(total / (double) cols);
+
+        int firstRow = Math.max(0, (int) Math.floor(scrollY / cellSpan) - PREFETCH_ROWS);
+        int lastRow = Math.min(totalRows - 1,
+                (int) Math.floor((scrollY + viewHeight()) / cellSpan) + PREFETCH_ROWS + 1);
+
+        for (int row = firstRow; row <= lastRow; row++) {
+            for (int col = 0; col < cols; col++) {
+                int i = row * cols + col;
+                if (i < 0 || i >= total) continue;
+                enqueuePriorityHydration(filteredIcons.get(i));
+            }
+        }
+    }
+
+    private void processHydrationBudget(int maxEntries, long budgetNs) {
+        long start = System.nanoTime();
+        int done = 0;
+        boolean changed = false;
+
+        while (done < maxEntries && (System.nanoTime() - start) < budgetNs) {
+            PickEntry entry = pollPriorityHydration();
+            if (entry == null) {
+                entry = nextBackgroundHydrationEntry();
+            }
+            if (entry == null) {
+                break;
+            }
+
+            if (hydrateEntry(entry)) {
+                done++;
+                changed = true;
+            }
+        }
+
+        if (changed && !normalizedFilter().isBlank()) {
+            hydrationChangedSearch = true;
+        }
+    }
+
+    private boolean hydrateEntry(PickEntry entry) {
+        if (entry == null || entry.custom || entry.richReady) {
+            return false;
+        }
+
+        String name = safeName(entry.itemRef);
+        if (name == null || name.isBlank()) {
+            name = entry.id;
+        }
+
+        String baseSearch = (entry.id + " " + name + " item").toLowerCase(Locale.ROOT);
+        entry.displayName = name;
+        entry.searchText = baseSearch;
+        entry.richReady = true;
+        vanillaHydratedCount++;
+
+        maybeQueuePinyin(entry, name);
+        return true;
+    }
+
+    private void maybeQueuePinyin(PickEntry entry, String name) {
+        if (entry == null || entry.pinyinQueued || !needsPinyinTokens(name)) {
+            return;
+        }
+        entry.pinyinQueued = true;
+
+        TOKEN_EXECUTOR.execute(() -> {
+            try {
+                PinyinSearchUtil.Tokens py = PinyinSearchUtil.tokens(name);
+                if (py == null) {
+                    return;
+                }
+                String extra = (py.spaced() + " " + py.compact() + " " + py.initials()).trim().toLowerCase(Locale.ROOT);
+                if (extra.isBlank()) {
+                    return;
+                }
+                String cur = entry.searchText == null ? "" : entry.searchText;
+                entry.searchText = (cur + " " + extra).trim();
+                asyncFilterRefreshRequested = true;
+            } catch (Throwable t) {
+                Constants.LOG.debug("[{}] IconPicker pinyin task failed for '{}': {}", Constants.MOD_NAME, entry.id, t.toString());
+            }
+        });
+    }
+
+    private void drawProgress(GuiGraphics g) {
+        int built;
+        int target;
+        boolean buildDone;
+        synchronized (VANILLA_LOCK) {
+            built = (CACHED_VANILLA == null) ? 0 : CACHED_VANILLA.size();
+            target = VANILLA_TARGET_COUNT;
+            buildDone = VANILLA_BUILD_COMPLETE;
+        }
+
+        String txt;
+        if (!buildDone) {
+            txt = "Indexing icons: " + built + "/" + Math.max(built, target);
+        } else if (vanillaHydratedCount < Math.max(1, localVanilla.size())) {
+            txt = "Preparing names: " + vanillaHydratedCount + "/" + localVanilla.size();
+        } else {
+            txt = "Icons: " + filteredIcons.size();
+        }
+
+        g.drawString(this.font, txt, gridLeft() + 6, gridBottom() - 11, 0xA0A0A0);
     }
 
     private int gridLeft() { return PADDING; }
@@ -233,10 +670,12 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
     private int iconAreaRight() { return gridRight() - 10; }
     private int iconAreaBottom() { return gridBottom() - 4; }
     private int iconAreaHeight() { return Math.max(1, iconAreaBottom() - iconAreaTop()); }
+
     private int iconCols() {
         int w = Math.max(1, iconAreaRight() - iconAreaLeft());
         return Math.max(1, w / (CELL + GAP));
     }
+
     private boolean inIconArea(double mx, double my) {
         return mx >= iconAreaLeft() && mx <= iconAreaRight() && my >= iconAreaTop() && my <= iconAreaBottom();
     }
@@ -334,28 +773,5 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
         int idx = row * cols + col;
         return (idx >= 0 && idx < filteredIcons.size()) ? idx : -1;
     }
-
-    private static List<PickEntry> cachedVanillaEntries() {
-        List<PickEntry> cache = CACHED_VANILLA;
-        if (cache != null) return cache;
-        synchronized (IconPickerScreen.class) {
-            cache = CACHED_VANILLA;
-            if (cache != null) return cache;
-
-            List<PickEntry> built = new ArrayList<>();
-            for (var e : BuiltInRegistries.ITEM.entrySet()) {
-                ResourceLocation rl = e.getKey().location();
-                String id = rl.getNamespace() + ":" + rl.getPath();
-                Item item = e.getValue();
-                String name = safeName(item);
-                PinyinSearchUtil.Tokens py = PinyinSearchUtil.tokens(name);
-                String search = (id + " " + name + " item "
-                        + py.spaced() + " " + py.compact() + " " + py.initials()).toLowerCase(Locale.ROOT);
-                built.add(new PickEntry(IconSpec.item(id), id, search, name, false));
-            }
-            built.sort((a, b) -> a.id.compareToIgnoreCase(b.id));
-            CACHED_VANILLA = List.copyOf(built);
-            return CACHED_VANILLA;
-        }
-    }
 }
+

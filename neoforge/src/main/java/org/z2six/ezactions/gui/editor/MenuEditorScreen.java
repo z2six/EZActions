@@ -4,6 +4,7 @@ package org.z2six.ezactions.gui.editor;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.z2six.ezactions.Constants;
@@ -48,6 +49,9 @@ public final class MenuEditorScreen extends Screen {
     private static final int LEFT_W = 160;
     private static final int ROW_H = 24;
     private static final int ICON_SZ = 18;
+    private static final int LIST_HEADER_H = 24;
+    private static final int LIST_HEADER_BG = 0xF0141414;
+    private static final int LIST_HEADER_ACCENT = 0xFFFC0553;
 
     // Drag visuals
     private static final int ACCENT_LINE = 0x80FC0553;
@@ -83,6 +87,7 @@ public final class MenuEditorScreen extends Screen {
     private EditorButton btnConfig; // NEW
 
     // List geometry
+    private int listPanelTop, listPanelHeight;
     private int listLeft, listTop, listWidth, listHeight;
 
     // Rows
@@ -330,6 +335,7 @@ public final class MenuEditorScreen extends Screen {
         // Filter
         filterBox = new EditBox(this.font, x, y, LEFT_W, 20, Component.translatable("ezactions.gui.field.filter"));
         filterBox.setHint(Component.translatable("ezactions.gui.menu_editor.hint.filter"));
+        filterBox.setTooltip(Tooltip.create(Component.translatable("ezactions.gui.menu_editor.tooltip.filter")));
         filterBox.setResponder(s -> rebuildRows());
         addRenderableWidget(filterBox);
         y += 24;
@@ -455,9 +461,11 @@ public final class MenuEditorScreen extends Screen {
 
         // --- List area on the right ---
         listLeft = left + LEFT_W + PAD;
-        listTop = top;
+        listPanelTop = top;
         listWidth = right - listLeft;
-        listHeight = bottom - top;
+        listPanelHeight = bottom - top;
+        listTop = listPanelTop + LIST_HEADER_H;
+        listHeight = Math.max(1, listPanelHeight - LIST_HEADER_H);
 
         scrollY = 0;
         selectedRow = -1;
@@ -562,11 +570,12 @@ public final class MenuEditorScreen extends Screen {
         // Background panels
         g.fill(0, 0, this.width, this.height, 0x88000000);
         g.fill(PAD, PAD, PAD + LEFT_W, this.height - PAD, 0xC0101010);
-        g.fill(listLeft, listTop, listLeft + listWidth, listTop + listHeight, 0xC0101010);
+        g.fill(listLeft, listPanelTop, listLeft + listWidth, listPanelTop + listPanelHeight, 0xC0101010);
+        g.fill(listLeft, listPanelTop, listLeft + listWidth, listPanelTop + LIST_HEADER_H, LIST_HEADER_BG);
+        g.fill(listLeft, listPanelTop + LIST_HEADER_H - 1, listLeft + listWidth, listPanelTop + LIST_HEADER_H, LIST_HEADER_ACCENT);
 
-        // Title
         int panelCenterX = listLeft + (listWidth / 2);
-        g.drawCenteredString(this.font, this.title, panelCenterX, 6, 0xFFFFFF);
+        g.drawCenteredString(this.font, this.title, panelCenterX, listPanelTop + (LIST_HEADER_H - this.font.lineHeight) / 2, 0xFFFFFF);
 
         int first = firstVisibleRow();
         int last  = lastVisibleRow();
@@ -1041,7 +1050,7 @@ public final class MenuEditorScreen extends Screen {
                 rowCount(), ROW_H, scrollY
         );
         boolean onListOrBar =
-                (mouseX >= listLeft && mouseX < listLeft + listWidth && mouseY >= listTop && mouseY < listTop + listHeight) ||
+                (mouseX >= listLeft && mouseX < listLeft + listWidth && mouseY >= listPanelTop && mouseY < listPanelTop + listPanelHeight) ||
                         (mouseX >= sb.trackX1 && mouseX < sb.trackX2 && mouseY >= sb.trackY1 && mouseY < sb.trackY2);
 
         if (onListOrBar) {
