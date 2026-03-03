@@ -40,7 +40,8 @@
   "ezactions.gui.hint.note_optional": "可选备注",
 
   "ezactions.gui.menu_editor.title": "EZ Actions - 菜单编辑器",
-  "ezactions.gui.menu_editor.hint.filter": "按标题、备注或动作类型筛选...",
+  "ezactions.gui.menu_editor.hint.filter": "筛选...",
+  "ezactions.gui.menu_editor.tooltip.filter": "按标题、备注或动作类型筛选...",
   "ezactions.gui.menu_editor.add_key_action": "添加按键动作",
   "ezactions.gui.menu_editor.add_command": "添加命令",
   "ezactions.gui.menu_editor.add_item_equip": "添加装备切换",

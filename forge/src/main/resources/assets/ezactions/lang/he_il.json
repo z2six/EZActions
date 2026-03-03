@@ -40,7 +40,8 @@
   "ezactions.gui.hint.note_optional": "Optional note",
 
   "ezactions.gui.menu_editor.title": "EZ Actions - Menu Editor",
-  "ezactions.gui.menu_editor.hint.filter": "Filter by title, note, or action type...",
+  "ezactions.gui.menu_editor.hint.filter": "Filter...",
+  "ezactions.gui.menu_editor.tooltip.filter": "Filter by title, note, or action type...",
   "ezactions.gui.menu_editor.add_key_action": "Add Key Action",
   "ezactions.gui.menu_editor.add_command": "Add Command",
   "ezactions.gui.menu_editor.add_item_equip": "Add Item Equip",

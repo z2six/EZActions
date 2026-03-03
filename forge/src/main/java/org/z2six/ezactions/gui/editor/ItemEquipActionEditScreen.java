@@ -130,7 +130,7 @@ public final class ItemEquipActionEditScreen extends EzScreen {
 
     @Override
     protected void init() {
-        this.panel = ActionEditorUi.panel(this.width, this.height, 980, 680, 8);
+        this.panel = ActionEditorUi.panel(this.width, this.height, 980, 520, 8);
         this.scroll.reset();
 
         bodyX = panel.x() + 14;
@@ -161,11 +161,13 @@ public final class ItemEquipActionEditScreen extends EzScreen {
         iconBaseY = topCardY + 34;
 
         titleBox = new EditBox(this.font, fieldX, topCardY + 26, fieldW, 20, Component.translatable("ezactions.gui.field.title"));
+        titleBox.setSuggestion(Component.translatable("ezactions.gui.item_equip.hint.title").getString());
         titleBox.setValue(draftTitle);
         titleBox.setResponder(s -> draftTitle = safe(s));
         scroll.track(addRenderableWidget(titleBox));
 
-        noteBox = new EditBox(this.font, fieldX, topCardY + 56, fieldW, 20, Component.translatable("ezactions.gui.field.note"));
+        noteBox = new EditBox(this.font, fieldX, topCardY + 60, fieldW, 20, Component.translatable("ezactions.gui.field.note"));
+        noteBox.setSuggestion(Component.translatable("ezactions.gui.hint.note_optional").getString());
         noteBox.setValue(draftNote);
         noteBox.setResponder(s -> draftNote = safe(s));
         scroll.track(addRenderableWidget(noteBox));
@@ -187,6 +189,8 @@ public final class ItemEquipActionEditScreen extends EzScreen {
         sourceVisibleRows = Math.max(1, (sourceH + SRC_GAP) / pitch);
 
         int buttonY = sourceCardY + sourceCardH + 12;
+        int contentBodyH = Math.max(1, (buttonY + 28) - bodyY);
+        bodyH = Math.min(bodyH, contentBodyH);
         int totalW = (96 * 3) + (8 * 2);
         int left = panel.x() + (panel.w() - totalW) / 2;
 
@@ -558,7 +562,5 @@ public final class ItemEquipActionEditScreen extends EzScreen {
         return Component.translatable("ezactions.gui.item_equip.slot." + slot.key());
     }
 }
-
-
 
 

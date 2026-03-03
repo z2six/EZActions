@@ -83,7 +83,7 @@ public final class KeyActionEditScreen extends EzScreen {
 
     @Override
     protected void init() {
-        this.panel = ActionEditorUi.panel(this.width, this.height, 760, 420, 10);
+        this.panel = ActionEditorUi.panel(this.width, this.height, 760, 272, 10);
         this.scroll.reset();
 
         bodyX = panel.x() + 14;
@@ -102,24 +102,27 @@ public final class KeyActionEditScreen extends EzScreen {
 
         titleBox = new EditBox(this.font, fieldX, y, fieldW, 20, Component.translatable("ezactions.gui.field.title"));
         titleBox.setMaxLength(MAX_LEN_TITLE);
+        titleBox.setSuggestion(Component.translatable("ezactions.gui.key_action.hint.title").getString());
         titleBox.setValue(draftTitle);
         titleBox.setResponder(s -> draftTitle = safe(s));
         scroll.track(addRenderableWidget(titleBox));
-        y += 30;
+        y += 34;
 
         noteBox = new EditBox(this.font, fieldX, y, fieldW, 20, Component.translatable("ezactions.gui.field.note"));
         noteBox.setMaxLength(MAX_LEN_NOTE);
+        noteBox.setSuggestion(Component.translatable("ezactions.gui.hint.note_optional").getString());
         noteBox.setValue(draftNote);
         noteBox.setResponder(s -> draftNote = safe(s));
         scroll.track(addRenderableWidget(noteBox));
-        y += 30;
+        y += 34;
 
         mappingBox = new EditBox(this.font, fieldX, y, fieldW, 20, Component.translatable("ezactions.gui.field.mapping_name"));
         mappingBox.setMaxLength(MAX_LEN_MAPPING);
+        mappingBox.setSuggestion(Component.translatable("ezactions.gui.key_action.hint.mapping").getString());
         mappingBox.setValue(draftMapping);
         wireMappingResponder();
         scroll.track(addRenderableWidget(mappingBox));
-        y += 30;
+        y += 34;
 
         scroll.track(addRenderableWidget(ActionEditorUi.button(fieldX, y, fieldW, 20, Component.translatable("ezactions.gui.key_action.pick_keybind"), () -> {
             try {
@@ -170,6 +173,7 @@ public final class KeyActionEditScreen extends EzScreen {
         int left = panel.x() + (panel.w() - totalW) / 2;
         cardBaseY = bodyY;
         cardBaseH = (buttonY - bodyY) + 34;
+        bodyH = Math.min(bodyH, cardBaseH + 4);
 
         scroll.track(addRenderableWidget(ActionEditorUi.button(left, buttonY, 96, 20, Component.translatable("ezactions.gui.common.save"), this::onSavePressed)));
         scroll.track(addRenderableWidget(ActionEditorUi.button(left + 104, buttonY, 96, 20, Component.translatable("ezactions.gui.common.cancel"), this::onClose)));
@@ -363,7 +367,5 @@ public final class KeyActionEditScreen extends EzScreen {
         return mouseX >= iconX && mouseX <= iconX + 32 && mouseY >= y && mouseY <= y + 32;
     }
 }
-
-
 
 

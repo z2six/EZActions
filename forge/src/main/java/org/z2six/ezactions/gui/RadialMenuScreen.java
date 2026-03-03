@@ -16,6 +16,7 @@ import org.z2six.ezactions.gui.anim.RadialTransition;
 import org.z2six.ezactions.gui.anim.SliceHoverAnim;
 import org.z2six.ezactions.gui.noblur.NoMenuBlurScreen;
 import org.z2six.ezactions.handler.KeyboardHandler;
+import org.z2six.ezactions.helper.ClientTaskQueue;
 
 import java.util.List;
 
@@ -163,7 +164,8 @@ public final class RadialMenuScreen extends EzScreen implements NoMenuBlurScreen
                     return true;
                 } else {
                     KeyboardHandler.suppressReopenUntilReleased();
-                    executeAndClose(mi);
+                    // Click path can occur mid-input processing; defer one tick for mod keybind compatibility.
+                    executeAndClose(mi, true);
                     return true;
                 }
             }
@@ -174,12 +176,16 @@ public final class RadialMenuScreen extends EzScreen implements NoMenuBlurScreen
     }
 
     private void executeAndClose(MenuItem mi) {
+        executeAndClose(mi, false);
+    }
+
+    private void executeAndClose(MenuItem mi, boolean deferToNextTick) {
         try {
             Constants.LOG.debug("[{}] Radial: execute action id='{}' title='{}' (closing then deferring)",
                     Constants.MOD_NAME, mi.id(), mi.title());
             Minecraft mc = this.minecraft;
             onClose(); // close first
-            mc.execute(() -> {
+            Runnable run = () -> {
                 try {
                     boolean ok = mi.action() != null && mi.action().execute(mc);
                     if (!ok) {
@@ -188,7 +194,13 @@ public final class RadialMenuScreen extends EzScreen implements NoMenuBlurScreen
                 } catch (Throwable t) {
                     Constants.LOG.warn("[{}] Radial deferred execution error for '{}': {}", Constants.MOD_NAME, mi.id(), t.toString());
                 }
-            });
+            };
+
+            if (deferToNextTick) {
+                ClientTaskQueue.post(run);
+            } else {
+                mc.execute(run);
+            }
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] executeAndClose error: {}", Constants.MOD_NAME, t.toString());
             onClose();
@@ -206,6 +218,5 @@ public final class RadialMenuScreen extends EzScreen implements NoMenuBlurScreen
         }
     }
 }
-
 
 
