@@ -170,16 +170,20 @@ public final class RadialMenu {
                 Constants.LOG.debug("[{}] openTemporary ignored: client/world not ready.", Constants.MOD_NAME);
                 return false;
             }
-            if (mc.screen != null || mc.isPaused()) {
+            if (mc.isPaused()) {
                 final String scr = (mc.screen == null) ? "none" : mc.screen.getClass().getSimpleName();
                 Constants.LOG.debug("[{}] openTemporary ignored: screen={}, paused={}", Constants.MOD_NAME, scr, mc.isPaused());
+                return false;
+            }
+            if (mc.screen instanceof RadialMenuScreen) {
+                Constants.LOG.debug("[{}] openTemporary ignored: radial screen already open.", Constants.MOD_NAME);
                 return false;
             }
 
             TEMP_ROOT = (rootItems == null) ? new ArrayList<>() : new ArrayList<>(rootItems);
             TEMP_PATH.clear();
             TEMP_STYLE = style;
-            TEMP_RETURN_SCREEN = returnTo;
+            TEMP_RETURN_SCREEN = returnTo != null ? returnTo : mc.screen;
             mc.setScreen(new RadialMenuScreen());
             return true;
         } catch (Throwable t) {
