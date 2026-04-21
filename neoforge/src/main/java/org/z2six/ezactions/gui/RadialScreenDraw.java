@@ -109,6 +109,37 @@ public final class RadialScreenDraw {
                 drawBaseSlice(g, designStyle, cx, cy, rInner, rOuter, a0, a1, baseColor, borderColor, fadeFactor);
             }
 
+            // Persistent active-state highlight, visible without hovering.
+            for (int i = 0; i < n; i++) {
+                if (i >= items.size()) continue;
+                MenuItem mi = items.get(i);
+                if (mi == null || !mi.active()) continue;
+
+                double a0 = (-Math.PI / 2.0) + i * step;
+                double a1 = a0 + step;
+                if (useWipe) {
+                    SectorClip clip = clipBySweep(i, step, sweep, ccw);
+                    if (clip == null) continue;
+                    a0 = clip.a0;
+                    a1 = clip.a1;
+                }
+                double width = a1 - a0;
+                if (width <= 0.0001) continue;
+
+                double localGap = Math.min(gapRad, width * 0.8);
+                if ("SEGMENTED".equals(designStyle) || "OUTLINE".equals(designStyle) || "GLASS".equals(designStyle)) {
+                    a0 += localGap * 0.5;
+                    a1 -= localGap * 0.5;
+                }
+                if (a1 <= a0) continue;
+
+                int activeFill = applyGlobalFade(withAlphaScale(hoverColor, 0.42f), fadeFactor);
+                int activeBorder = applyGlobalFade(withAlphaScale(hoverColor, 0.85f), fadeFactor);
+
+                fillRingSector(g, cx, cy, rr.inner(), rr.outer(), a0, a1, activeFill);
+                fillRingSector(g, cx, cy, Math.max(rr.outer() - 2.5, rr.inner()), rr.outer(), a0, a1, activeBorder);
+            }
+
             // Instant fill highlight when hover anim is disabled but fill mode enabled.
             if ((!animationsEnabled || !animHover) && hoverFillMode && hoveredIdx >= 0 && hoveredIdx < n) {
                 double a0 = (-Math.PI / 2.0) + hoveredIdx * step;
