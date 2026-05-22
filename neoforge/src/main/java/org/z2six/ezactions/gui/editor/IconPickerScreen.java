@@ -19,6 +19,8 @@ import org.z2six.ezactions.gui.noblur.NoMenuBlurScreen;
 import org.z2six.ezactions.util.CustomIconManager;
 import org.z2six.ezactions.util.PinyinSearchUtil;
 
+import org.z2six.ezactions.VanillaIconCache;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
@@ -69,12 +71,7 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
     private final Screen parent;
     private final Consumer<IconSpec> onPick;
 
-    // Session-wide vanilla cache that is built progressively.
-    private static final Object VANILLA_LOCK = new Object();
-    private static List<PickEntry> CACHED_VANILLA = null;
-    private static Iterator<Map.Entry<ResourceKey<Item>, Item>> VANILLA_ITER = null;
-    private static boolean VANILLA_BUILD_COMPLETE = false;
-    private static int VANILLA_TARGET_COUNT = 0;
+    // Cache delegated to VanillaIconCache (common module).
 
     // Async workers: filtering and optional pinyin enrichment.
     private static final ExecutorService FILTER_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
@@ -134,6 +131,15 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
     private static final long FILTER_DEBOUNCE_NS = 130_000_000L; // 130 ms
     private static final long HYDRATION_FILTER_REFRESH_NS = 220_000_000L; // 220 ms
 
+    /** True when VanillaIconCache has indexed the full registry. */
+    private static boolean isVicComplete() {
+        return VanillaIconCache.isComplete();
+    }
+
+    // ── "Rebuild Cache" button (bottom area) ───────────────────────────────────
+    private static final String REBUILD_LABEL = "Rebuild Cache";
+    private int rebuildBtnLeft, rebuildBtnTop, rebuildBtnRight, rebuildBtnBottom;
+
     private boolean draggingScrollbar = false;
     private int dragGrabOffsetY = 0;
 
@@ -150,12 +156,26 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
     @Override
     protected void init() {
         try {
+            // Shrink filter box to make room for "Rebuild Cache" button on its right
+            int btnAreaW = this.font.width(REBUILD_LABEL) + 8;
+            int filterW = Math.max(120, this.width - PADDING * 2 - btnAreaW - 8);
             filterBox = new EditBox(this.font, PADDING, PADDING,
-                    Math.max(120, this.width - PADDING * 2 - 20), 18, Component.translatable("ezactions.gui.field.filter"));
+                    filterW, 18, Component.translatable("ezactions.gui.field.filter"));
+            int btnX = PADDING + filterW + 8;
+            int btnY = PADDING + 1;
+            this.rebuildBtnLeft = btnX;
+            this.rebuildBtnTop = btnY;
+            this.rebuildBtnRight = btnX + this.font.width(REBUILD_LABEL);
+            this.rebuildBtnBottom = btnY + this.font.lineHeight;
             filterBox.setValue(filter);
             filterBox.setSuggestion(Component.translatable("ezactions.gui.icon_picker.hint.filter").getString());
             filterBox.setResponder(s -> {
                 filter = s == null ? "" : s;
+                if (filter.isEmpty()) {
+                    filterBox.setSuggestion(Component.translatable("ezactions.gui.icon_picker.hint.filter").getString());
+                } else {
+                    filterBox.setSuggestion("");
+                }
                 requestFilterRefresh(false);
             });
             addRenderableWidget(filterBox);
@@ -181,12 +201,22 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
                 allIcons.add(new PickEntry(IconSpec.custom(id), id, search, id, true, null, true));
             }
 
-            ensureVanillaBuildStarted();
-            // Small warmup chunk so first open has immediate results but doesn't hitch.
-            pumpVanillaBuild(96, 700_000L);
+            // Kick off the cache if not already building; attach whatever is available.
+            VanillaIconCache.tickWarmup();
             attachNewVanillaEntries();
 
-            requestFilterRefresh(true);
+            // When the full cache is already built (pre-warmed or loaded from disk),
+            // skip async filter and populate filteredIcons immediately.
+            if (VanillaIconCache.isComplete() && filter.isBlank()) {
+                filteredIcons.clear();
+                filteredIcons.addAll(allIcons);
+                appliedFilterGeneration = ++filterGeneration;
+                filterDirty = false;
+                filterInFlight = false;
+                pendingFilterResult = null;
+            } else {
+                requestFilterRefresh(true);
+            }
         } catch (Throwable t) {
             Constants.LOG.warn("[{}] IconPicker init failed: {}", Constants.MOD_NAME, t.toString());
         }
@@ -195,7 +225,7 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
     @Override
     public void tick() {
         // Continue lightweight vanilla index build without blocking UI.
-        pumpVanillaBuild(VANILLA_BUILD_MAX_PER_TICK, VANILLA_BUILD_BUDGET_NS);
+        VanillaIconCache.tickWarmup();
         attachNewVanillaEntries();
 
         applyPendingFilterResult();
@@ -227,6 +257,13 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
         if (button != 0) return super.mouseClicked(mx, my, button);
 
         if (beginScrollbarDragIfHit(mx, my)) return true;
+
+        // "Rebuild Cache" click
+        if (mx >= rebuildBtnLeft && mx <= rebuildBtnRight && my >= rebuildBtnTop && my <= rebuildBtnBottom) {
+            VanillaIconCache.invalidateDiskCache();
+            init();
+            return true;
+        }
 
         if (!inIconArea(mx, my)) {
             return super.mouseClicked(mx, my, button);
@@ -317,6 +354,12 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
         drawScrollbar(g);
         super.render(g, mouseX, mouseY, partialTick);
 
+        // Rebuild Cache button — to the right of the search bar
+        boolean hoveredBtn = mouseX >= rebuildBtnLeft && mouseX <= rebuildBtnRight
+                && mouseY >= rebuildBtnTop && mouseY <= rebuildBtnBottom;
+        g.drawString(this.font, REBUILD_LABEL, rebuildBtnLeft, rebuildBtnTop,
+                hoveredBtn ? 0xFFFF8C00 : 0xFF6CFC05);
+
         if (hovered != null) {
             if (hovered.custom) {
                 g.renderTooltip(this.font, Component.translatable("ezactions.gui.icon_picker.tooltip.custom", hovered.id), mouseX, mouseY);
@@ -347,69 +390,33 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
         return false;
     }
 
-    private static void ensureVanillaBuildStarted() {
-        synchronized (VANILLA_LOCK) {
-            if (VANILLA_BUILD_COMPLETE || VANILLA_ITER != null) {
-                return;
-            }
-            VANILLA_TARGET_COUNT = Math.max(0, BuiltInRegistries.ITEM.entrySet().size());
-            if (CACHED_VANILLA == null) {
-                CACHED_VANILLA = new ArrayList<>(Math.max(256, VANILLA_TARGET_COUNT));
-            }
-            VANILLA_ITER = BuiltInRegistries.ITEM.entrySet().iterator();
-        }
-    }
-
-    private static int pumpVanillaBuild(int maxItems, long budgetNs) {
-        ensureVanillaBuildStarted();
-        long start = System.nanoTime();
-        int added = 0;
-
-        synchronized (VANILLA_LOCK) {
-            if (VANILLA_BUILD_COMPLETE || VANILLA_ITER == null) {
-                return 0;
-            }
-
-            while (added < maxItems && (System.nanoTime() - start) < budgetNs && VANILLA_ITER.hasNext()) {
-                Map.Entry<ResourceKey<Item>, Item> e = VANILLA_ITER.next();
-                ResourceLocation rl = e.getKey().location();
-                String id = rl.getNamespace() + ":" + rl.getPath();
-                Item item = e.getValue();
-                String base = (id + " item").toLowerCase(Locale.ROOT);
-                CACHED_VANILLA.add(new PickEntry(IconSpec.item(id), id, base, id, false, item, false));
-                added++;
-            }
-
-            if (!VANILLA_ITER.hasNext()) {
-                VANILLA_ITER = null;
-                VANILLA_BUILD_COMPLETE = true;
-            }
-        }
-
-        return added;
-    }
-
+    /** Wrap VanillaIconCache entries into PickEntry objects and attach to the instance list. */
     private void attachNewVanillaEntries() {
-        List<PickEntry> slice;
-        synchronized (VANILLA_LOCK) {
-            int total = (CACHED_VANILLA == null) ? 0 : CACHED_VANILLA.size();
-            if (vanillaAttachedCount >= total) {
-                return;
-            }
-            slice = new ArrayList<>(CACHED_VANILLA.subList(vanillaAttachedCount, total));
-            vanillaAttachedCount = total;
-        }
+        int total = VanillaIconCache.entryCount();
+        if (vanillaAttachedCount >= total) return;
 
-        for (PickEntry e : slice) {
-            allIcons.add(e);
-            localVanilla.add(e);
-            if (e.richReady) {
-                vanillaHydratedCount++;
-            }
+        List<VanillaIconCache.Entry> incoming = VanillaIconCache.slice(vanillaAttachedCount);
+        if (incoming.isEmpty()) return;
+
+        for (VanillaIconCache.Entry ce : incoming) {
+            ResourceLocation rl = ResourceLocation.tryParse(ce.id());
+            Item item = (rl == null) ? null : BuiltInRegistries.ITEM.get(rl);
+            boolean rich = ce.displayName() != null && !ce.displayName().equals(ce.id());
+            PickEntry pe = new PickEntry(
+                    IconSpec.item(ce.id()), ce.id(),
+                    ce.searchText(), ce.displayName(),
+                    false, item, rich
+            );
+            allIcons.add(pe);
+            localVanilla.add(pe);
+            if (rich) vanillaHydratedCount++;
         }
+        vanillaAttachedCount += incoming.size();
 
         requestFilterRefresh(false);
     }
+
+    // (Now handled by the VanillaIconCache-based attachNewVanillaEntries above)
 
     private void requestFilterRefresh(boolean immediate) {
         filterDirty = true;
@@ -640,17 +647,12 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
     }
 
     private void drawProgress(GuiGraphics g) {
-        int built;
-        int target;
-        boolean buildDone;
-        synchronized (VANILLA_LOCK) {
-            built = (CACHED_VANILLA == null) ? 0 : CACHED_VANILLA.size();
-            target = VANILLA_TARGET_COUNT;
-            buildDone = VANILLA_BUILD_COMPLETE;
-        }
+        int built = VanillaIconCache.entryCount();
+        int target = VanillaIconCache.targetCount();
+        boolean buildDone = VanillaIconCache.isComplete();
 
         String txt;
-        if (!buildDone) {
+        if (!buildDone && target > 0) {
             txt = "Indexing icons: " + built + "/" + Math.max(built, target);
         } else if (vanillaHydratedCount < Math.max(1, localVanilla.size())) {
             txt = "Preparing names: " + vanillaHydratedCount + "/" + localVanilla.size();
