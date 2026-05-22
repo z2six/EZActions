@@ -96,6 +96,7 @@
   "ezactions.gui.icon_picker.hint.filter": "Filter by item id, name, or custom id...",
   "ezactions.gui.icon_picker.tooltip.custom": "Custom icon [%s]",
   "ezactions.gui.icon_picker.tooltip.item": "%s [%s]",
+  "ezactions.gui.icon_picker.rebuild_cache": "Rebuild Cache",
 
   "ezactions.gui.keybind_picker.title": "Choose Keybinding",
   "ezactions.gui.keybind_picker.hint.filter": "Filter by mod / key id / label...",

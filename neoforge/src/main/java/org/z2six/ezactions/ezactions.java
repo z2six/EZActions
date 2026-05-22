@@ -8,6 +8,8 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import org.z2six.ezactions.VanillaIconCache;
 import org.z2six.ezactions.config.DesignClientConfig;
 import org.z2six.ezactions.handler.KeyboardHandler;
 import org.z2six.ezactions.util.CustomIconManager;
@@ -63,6 +65,9 @@ public final class ezactions {
                 try { CustomIconManager.ensureFolderReady(); } catch (Throwable ignored) {}
                 NeoForge.EVENT_BUS.addListener(KeyboardHandler::onClientTickPre);
                 NeoForge.EVENT_BUS.addListener(KeyboardHandler::onClientTickPost);
+                // Pre-warm the icon cache on each tick so the index is ready
+                // before the user opens the picker for the first time.
+                NeoForge.EVENT_BUS.addListener((ClientTickEvent.Pre e) -> VanillaIconCache.tickWarmup());
                 Constants.LOG.debug("[{}] Registered GAME-bus listeners (Pre & Post).", Constants.MOD_NAME);
             }
         } catch (Throwable t) {
