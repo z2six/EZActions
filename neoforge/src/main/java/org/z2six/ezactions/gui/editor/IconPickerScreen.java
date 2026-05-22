@@ -131,13 +131,8 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
     private static final long FILTER_DEBOUNCE_NS = 130_000_000L; // 130 ms
     private static final long HYDRATION_FILTER_REFRESH_NS = 220_000_000L; // 220 ms
 
-    /** True when VanillaIconCache has indexed the full registry. */
-    private static boolean isVicComplete() {
-        return VanillaIconCache.isComplete();
-    }
-
-    // ── "Rebuild Cache" button (bottom area) ───────────────────────────────────
-    private static final String REBUILD_LABEL = "Rebuild Cache";
+    // ── "Rebuild Cache" button ───────────────────────────────────────────────
+    private static final Component REBUILD_LABEL = Component.translatable("ezactions.gui.icon_picker.rebuild_cache");
     private int rebuildBtnLeft, rebuildBtnTop, rebuildBtnRight, rebuildBtnBottom;
 
     private boolean draggingScrollbar = false;
@@ -157,7 +152,8 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
     protected void init() {
         try {
             // Shrink filter box to make room for "Rebuild Cache" button on its right
-            int btnAreaW = this.font.width(REBUILD_LABEL) + 8;
+            int rebuildW = this.font.width(REBUILD_LABEL.getVisualOrderText());
+            int btnAreaW = rebuildW + 8;
             int filterW = Math.max(120, this.width - PADDING * 2 - btnAreaW - 8);
             filterBox = new EditBox(this.font, PADDING, PADDING,
                     filterW, 18, Component.translatable("ezactions.gui.field.filter"));
@@ -165,7 +161,7 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
             int btnY = PADDING + 1;
             this.rebuildBtnLeft = btnX;
             this.rebuildBtnTop = btnY;
-            this.rebuildBtnRight = btnX + this.font.width(REBUILD_LABEL);
+            this.rebuildBtnRight = btnX + rebuildW;
             this.rebuildBtnBottom = btnY + this.font.lineHeight;
             filterBox.setValue(filter);
             filterBox.setSuggestion(Component.translatable("ezactions.gui.icon_picker.hint.filter").getString());
@@ -261,6 +257,7 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
         // "Rebuild Cache" click
         if (mx >= rebuildBtnLeft && mx <= rebuildBtnRight && my >= rebuildBtnTop && my <= rebuildBtnBottom) {
             VanillaIconCache.invalidateDiskCache();
+            clearWidgets();
             init();
             return true;
         }
@@ -357,7 +354,7 @@ public final class IconPickerScreen extends Screen implements NoMenuBlurScreen {
         // Rebuild Cache button — to the right of the search bar
         boolean hoveredBtn = mouseX >= rebuildBtnLeft && mouseX <= rebuildBtnRight
                 && mouseY >= rebuildBtnTop && mouseY <= rebuildBtnBottom;
-        g.drawString(this.font, REBUILD_LABEL, rebuildBtnLeft, rebuildBtnTop,
+        g.drawString(this.font, REBUILD_LABEL.getVisualOrderText(), rebuildBtnLeft, rebuildBtnTop,
                 hoveredBtn ? 0xFFFF8C00 : 0xFF6CFC05);
 
         if (hovered != null) {
